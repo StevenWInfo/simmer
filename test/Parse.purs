@@ -1,25 +1,20 @@
 module Test.Parse where
 
 import Prelude
-import Effect (Effect)
-import Effect.Aff (launchAff_)
 import Effect.Exception (Error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
 import Text.Parsing.StringParser (runParser)
 import Test.Spec (it, pending, describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
-import Test.Spec.Runner (runSpec)
-import Test.Spec.Reporter.Console (consoleReporter)
 
 import Ast (Expression(..))
-import Parse (numberExpr, stringExpr)
+import Parse (numberExpr, stringExpr, removeComments)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 parseSuite = describe "parseSuite" do
-    pending "parse smoke test"
-    it "Test digit parser" do
+    it "Test number parser single digit" do
        (runParser numberExpr "3") `shouldEqual` (Right <<< Number $ 3.0)
     it "Test number parser" do
        (runParser numberExpr "14") `shouldEqual` (Right <<< Number $ 14.0)
@@ -31,3 +26,20 @@ parseSuite = describe "parseSuite" do
        (runParser numberExpr "37.5") `shouldEqual` (Right <<< Number $ (37.5))
     it "Test String" do
        (runParser stringExpr "\"Lorem ipsum.\"") `shouldEqual` (Right <<< String $ "Lorem ipsum.")
+    removingComments
+
+commentWithInlineNewline :: String
+commentWithInlineNewline = "foo # new comment \n bar"
+
+removingComments :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+removingComments = describe "Test removing comments" do
+    it "Test empty string" do
+       runParser removeComments "" `shouldEqual` Right ""
+    it "Test no comment" do
+       runParser removeComments "foo bar" `shouldEqual` Right "foo bar"
+    it "Test no comment with string" do
+       runParser removeComments "foo \"middle\" bar" `shouldEqual` Right "foo \"middle\" bar"
+    it "Test string with hash" do
+       runParser removeComments "foo \"abc#middle\" bar" `shouldEqual` Right "foo \"abc#middle\" bar"
+    it "Test comment with inline newline" do
+       runParser removeComments commentWithInlineNewline `shouldEqual` Right "foo \n bar"

@@ -2,8 +2,6 @@ module Ast where
 
 import Prelude
 
-import Data.Maybe (Maybe)
-
 type Name = String
 
 data Expression
@@ -16,7 +14,7 @@ data Expression
     | Prefix String Expression
     | Infix Expression String Expression
     | PostFix Expression String
-    | If Expression Expression (Maybe Expression)
+    | If Expression Expression Expression
     -- A case expression?
 
 instance showExpression :: Show Expression where
@@ -27,10 +25,9 @@ instance showExpression :: Show Expression where
                  Function params body -> "Fn" <> show params <> "<" <> show body <> ">"
                  Assignment i body -> "Let(" <> show i <> ")In(" <> show body <> ")"
                  Call fn input -> "AppliedFn<" <> show fn <> ">(" <> show input <> ")"
-                 -- TODO
-                 Prefix _ _ -> "foo"
-                 Infix _ _ _ -> "foo"
-                 PostFix _ _ -> "foo"
-                 If _ _ _ -> "foo"
+                 Prefix op exp -> show op <> show exp
+                 Infix pre op post -> show pre <> " " <> show op <> " " <> show post
+                 PostFix exp op -> show exp <> show op
+                 If pred thn els -> "If " <> show pred <> " then " <> show thn <> " else " <> show els
 
 derive instance eqExpression :: Eq Expression 

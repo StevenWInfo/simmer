@@ -13,6 +13,7 @@ You can edit this file as you like.
     , "spec"
     , "numbers"
     , "purescript-yarn"
+    , "debug"
     ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
