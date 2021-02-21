@@ -13,7 +13,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Runner (runSpec)
 import Test.Spec.Reporter.Console (consoleReporter)
 
-import Parse (digit, integer)
+import Parse (number)
 
 main :: Effect Unit
 main = launchAff_ $ runSpec [consoleReporter] do
@@ -24,10 +24,12 @@ parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 parseSuite = describe "parseSuite" do
     pending "parse smoke test"
     it "Test digit parser" do
-       (runParser digit "3") `shouldEqual` (Right 3)
+       (runParser number "3") `shouldEqual` (Right 3.0)
     it "Test number parser" do
-       (runParser integer "14") `shouldEqual` (Right 14)
+       (runParser number "14") `shouldEqual` (Right 14.0)
     it "Test three digit number parser" do
-       (runParser integer "789") `shouldEqual` (Right 789)
+       (runParser number "789") `shouldEqual` (Right 789.0)
     it "Test negative number parser" do
-       (runParser integer "-37") `shouldEqual` (Right (-37))
+       (runParser number "-37") `shouldEqual` (Right (-37.0))
+    it "Test float" do
+       (runParser number "37.5") `shouldEqual` (Right (37.5))
