@@ -17,6 +17,7 @@ interpret expr = do
 -- eval' :: Expression -> Effect 
 -- eval' x = case
 
+-- Not sure how to test this.
 eval :: Expression -> Effect (Either String Value)
 eval expr = do
     log "eval not finished yet."

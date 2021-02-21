@@ -14,8 +14,8 @@ import Ast (Expression(..))
 parse :: String -> Expression
 parse source = String "Not implemented"
 
-number :: Parser Number
-number = do
+toNumber :: Parser Number
+toNumber = do
     neg <- string "-" <|> pure ""
     whole <- many1 anyDigit
     dec <- string "." <|> pure ""
@@ -25,9 +25,12 @@ number = do
         Just num -> pure num
         Nothing -> fail "Couldn't parse number"
 
-stringExpr :: Parser String
+numberExpr :: Parser Expression
+numberExpr = Number <$> toNumber
+
+stringExpr :: Parser Expression
 stringExpr = do
-    _ <- string "\""
-    value <- fromChars <$> (many $ noneOf ['"'])
-    _ <- string "\""
+    _ <- String <$> (string "\"")
+    value <- (String <<< fromChars) <$> (many $ noneOf ['"'])
+    _ <- String <$> string "\""
     pure value
