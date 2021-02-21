@@ -39,15 +39,16 @@ removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
 
 -- Just removes comments
 parse :: String -> Either ParseError Expression
-parse source = uncommented >>= runParser expression
+parse source = uncommented >>= runParser expressionParser
     where
       uncommented = runParser removeComments source
 
-expression :: Parser Expression
-expression = do
+expressionParser :: Parser Expression
+expressionParser = do
     _ <- (\_ -> String "") <$> skipSpaces
     numberExpr
         <|> stringExpr
+        <|> parenExpr
         <|> assignmentExpr
         <|> identExpr
     where
@@ -87,7 +88,7 @@ stringExpr = do
     pure value
 
 identExpr :: Parser Expression
-identExpr = (Ident <<< fromChars) <$> (many $ noneOf ['"'])
+identExpr = (Ident <<< fromChars) <$> (many nameCharacters)
 
 -- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
 reserved :: Array String
@@ -111,6 +112,14 @@ nameParser = do
     _ <- if elem name reserved then fail "Tried to assign to reserved name" else pure ""
     pure name
 
+-- Can't use `between` with mutual recursion here.
+parenExpr :: Parser Expression
+parenExpr = do
+    _ <- char '('
+    expr <- expressionParser
+    _ <- char ')'
+    pure $ Prefix "(" expr
+
 -- Need to limit to non-reserved things.
 assignmentExpr :: Parser Expression
 assignmentExpr = do
@@ -121,11 +130,22 @@ assignmentExpr = do
     name <- nameParser
     skipSpaces
     _ <- string "="
-    assignedVal <- expression
+    assignedVal <- expressionParser
     skipSpaces
     _ <- do
        _ <- strSkip $ string "in"
        spaces <- whiteSpace
        if spaces == "" then fail "Not let" else pure ""
-    body <- expression
+    body <- expressionParser
     pure $ Assignment name assignedVal body
+
+reservedOperators :: Array String
+reservedOperators =
+    [ "("
+    ]
+
+opCharacters :: Array Char
+opCharacters =
+    [ '('
+    , ')'
+    ]

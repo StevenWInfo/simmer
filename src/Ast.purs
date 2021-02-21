@@ -16,7 +16,6 @@ data Expression
     | PostFix Expression Name
     | If Expression Expression Expression
     -- A case expression?
-    -- Do I need paren expression?
 
 instance showExpression :: Show Expression where
     show e = case e of
