@@ -34,3 +34,6 @@ stringExpr = do
     value <- (String <<< fromChars) <$> (many $ noneOf ['"'])
     _ <- String <$> string "\""
     pure value
+
+identExpr :: Parser Expression
+identExpr = (String <<< fromChars) <$> (many $ noneOf ['"'])
