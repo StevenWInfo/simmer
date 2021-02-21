@@ -2,14 +2,15 @@ module Parse where
 
 import Prelude
 import Control.Alt ((<|>))
-import Text.Parsing.StringParser (Parser, fail)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof)
+import Text.Parsing.StringParser (Parser, fail, runParser, ParseError)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
 import Data.String.Yarn (fromChars)
 import Data.Foldable (fold)
 import Data.String.CodeUnits (singleton)
+import Data.Either (Either(..))
 
 import Ast (Expression(..))
 
@@ -35,8 +36,20 @@ removeComments :: Parser String
 removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
     where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
 
-parse :: String -> Expression
-parse source = String "Not implemented"
+-- Just removes comments
+parse :: String -> Either ParseError Expression
+parse source = uncommented >>= runParser expression
+    where
+      uncommented = runParser removeComments source
+
+expression :: Parser Expression
+expression = do
+    _ <- (\_ -> String "") <$> skipSpaces
+    numberExpr
+        <|> stringExpr
+        <|> identExpr
+    where
+        toExp = (\ws -> String ws) <$> whiteSpace
 
 toNumber :: Parser Number
 toNumber = do
@@ -60,4 +73,4 @@ stringExpr = do
     pure value
 
 identExpr :: Parser Expression
-identExpr = (String <<< fromChars) <$> (many $ noneOf ['"'])
+identExpr = (Ident <<< fromChars) <$> (many $ noneOf ['"'])
