@@ -13,13 +13,14 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Runner (runSpec)
 import Test.Spec.Reporter.Console (consoleReporter)
 
-import Parse (number)
+import Parse (number, stringExpr)
 
 main :: Effect Unit
 main = launchAff_ $ runSpec [consoleReporter] do
     --it "does nothing" $ pure unit
     parseSuite
 
+-- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 parseSuite = describe "parseSuite" do
     pending "parse smoke test"
@@ -33,3 +34,5 @@ parseSuite = describe "parseSuite" do
        (runParser number "-37") `shouldEqual` (Right (-37.0))
     it "Test float" do
        (runParser number "37.5") `shouldEqual` (Right (37.5))
+    it "Test String" do
+       (runParser stringExpr "\"Lorem ipsum.\"") `shouldEqual` (Right "Lorem ipsum.")
