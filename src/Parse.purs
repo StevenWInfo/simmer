@@ -5,7 +5,7 @@ import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser)
 import Text.Parsing.StringParser.CodePoints (string)
 import Text.Parsing.StringParser.Combinators (many1)
-import Data.List.NonEmpty (head)
+import Data.Foldable (foldl)
 
 import Ast (Expression(..))
 
@@ -25,9 +25,10 @@ digit = let strToInt str int = string str >>= \_ -> pure int
          <|> strToInt "8" 8
          <|> strToInt "9" 9
 
-number :: Parser Int
-number = do
-    start <- string "-" <|> pure ""
-    cs <- many1 digit
-    let foo = head cs
-    pure (if start == "-" then -1 * foo else foo)
+integer :: Parser Int
+integer = do
+   start <- string "-" <|> pure ""
+   digits <- many1 digit
+   -- Probably need to find a more efficient way. JS FFI if nothing else.
+   let int = foldl (\accum new -> (10 * accum) + new) 0 digits
+   pure (if start == "-" then -1 * int else int)
