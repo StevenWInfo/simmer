@@ -8,14 +8,15 @@ data Expression
     = Ident Name
     | Number Number
     | String String
-    | Function (Array String) Expression
-    | Assignment String Expression
+    | Function (Array Name) Expression
+    | Assignment Name Expression Expression
     | Call Expression (Array Expression)
-    | Prefix String Expression
-    | Infix Expression String Expression
-    | PostFix Expression String
+    | Prefix Name Expression
+    | Infix Expression Name Expression
+    | PostFix Expression Name
     | If Expression Expression Expression
     -- A case expression?
+    -- Do I need paren expression?
 
 instance showExpression :: Show Expression where
     show e = case e of
@@ -23,7 +24,7 @@ instance showExpression :: Show Expression where
                  Number n -> "Num(" <> show n <> ")"
                  String s -> "Str(" <> show s <> ")"
                  Function params body -> "Fn" <> show params <> "<" <> show body <> ">"
-                 Assignment i body -> "Let(" <> show i <> ")In(" <> show body <> ")"
+                 Assignment name expr body -> "Let(" <> show name <> ")Equals(" <> show expr <> ")In(" <> show body <> ")"
                  Call fn input -> "AppliedFn<" <> show fn <> ">(" <> show input <> ")"
                  Prefix op exp -> show op <> show exp
                  Infix pre op post -> show pre <> " " <> show op <> " " <> show post
@@ -31,3 +32,7 @@ instance showExpression :: Show Expression where
                  If pred thn els -> "If " <> show pred <> " then " <> show thn <> " else " <> show els
 
 derive instance eqExpression :: Eq Expression 
+
+-- Should there be an AST validator? Check structure without evaluating?
+
+-- fn for start of function wouldn't be bad.

@@ -9,13 +9,16 @@ import Test.Spec (it, pending', describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
-import Parse (numberExpr, stringExpr, removeComments, expression, parse)
+import Parse (numberExpr, stringExpr, removeComments, expression, parse, identExpr, assignmentExpr)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 parseSuite = describe "parseSuite" do
     removingComments
     stringParsing
+    numberParsing
+    assignmentParsing
+    identParsing
     it "Expression parser smoke test" do
        runParser expression "1" `shouldEqual` Right (Number 1.0)
     it "Expression parser: strip whitespace" do
@@ -26,6 +29,11 @@ parseSuite = describe "parseSuite" do
        parse "\"1\"" `shouldEqual` Right (String "1")
     it "Parsing variable smoke test" do
        parse "foo" `shouldEqual` Right (Ident "foo")
+    -- Should this pass or fail?
+    it "Test ident start with number" do
+       parse "37foo" `shouldEqual` Right (Ident "37foo")
+    it "Test assignment smoke" do
+       parse "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
 
 commentWithInlineNewline :: String
 commentWithInlineNewline = "foo # new comment \n bar"
@@ -64,3 +72,18 @@ numberParsing = describe "Test parsing strings" do
        (runParser numberExpr "-37") `shouldEqual` (Right <<< Number $ (-37.0))
     it "Test float" do
        (runParser numberExpr "37.5") `shouldEqual` (Right <<< Number $ (37.5))
+
+assignmentParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+assignmentParsing = describe "Test parsing assignment" do
+    it "Test assignment smoke" do
+       (runParser assignmentExpr "let foo = 123 in foo") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+
+identParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+identParsing = describe "Test parsing variables" do
+    it "Test ident start with number" do
+       (runParser identExpr "foo") `shouldEqual` (Right $ Ident "37foo")
+    it "Test ident with number" do
+       (runParser identExpr "foo37") `shouldEqual` (Right $ Ident "foo37")
+    -- Should this pass or fail?
+    it "Test ident start with number" do
+       (runParser identExpr "37foo") `shouldEqual` (Right $ Ident "37foo")

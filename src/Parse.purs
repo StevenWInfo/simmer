@@ -2,22 +2,23 @@ module Parse where
 
 import Prelude
 import Control.Alt ((<|>))
-import Text.Parsing.StringParser (Parser, fail, runParser, ParseError)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
+import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, anyChar, alphaNum)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, manyTill)
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
 import Data.String.Yarn (fromChars)
-import Data.Foldable (fold)
+import Data.Foldable (fold, elem)
 import Data.String.CodeUnits (singleton)
-import Data.Either (Either(..))
+import Data.Either (Either)
+
+import Debug.Trace (spy)
 
 import Ast (Expression(..))
 
 {-
-    Comments? Maybe do a single initial pass eliminating them from the input.
-        Have to make sure they're not in a string literal though.
-            Or maybe having it be part of Expression would be alright?
+    TODO look into Text.Parsing.StringParser.Expr
+    TODO parse importing
     -}
 
 identifyString :: Parser String
@@ -47,9 +48,22 @@ expression = do
     _ <- (\_ -> String "") <$> skipSpaces
     numberExpr
         <|> stringExpr
+        <|> assignmentExpr
         <|> identExpr
     where
         toExp = (\ws -> String ws) <$> whiteSpace
+
+skip :: forall a. Parser a -> Parser Unit
+skip parser = do
+    _ <- parser
+    pure unit
+
+-- Why did I want this again?
+exprSkip :: Parser Expression -> Parser Expression
+exprSkip parser = (\_ -> String "") <$> skip parser
+
+strSkip :: Parser String -> Parser Expression
+strSkip parser = (\_ -> String "") <$> parser
 
 toNumber :: Parser Number
 toNumber = do
@@ -74,3 +88,44 @@ stringExpr = do
 
 identExpr :: Parser Expression
 identExpr = (Ident <<< fromChars) <$> (many $ noneOf ['"'])
+
+-- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
+reserved :: Array String
+reserved =
+    [ "let"
+    , "in"
+    --, "\\"
+    , "if"
+    , "else"
+    , "case"
+    , "of"
+    , "import"
+    ]
+
+nameCharacters :: Parser Char
+nameCharacters = alphaNum <|> (char '_') <|> (char '\'')
+
+nameParser :: Parser String
+nameParser = do
+    name <- fromChars <$> many nameCharacters--manyTill anyChar whiteSpace 
+    _ <- if elem name reserved then fail "Tried to assign to reserved name" else pure ""
+    pure name
+
+-- Need to limit to non-reserved things.
+assignmentExpr :: Parser Expression
+assignmentExpr = do
+    _ <- try do
+       _ <- strSkip $ string "let"
+       spaces <- whiteSpace
+       if spaces == "" then fail "Not let" else pure ""
+    name <- nameParser
+    skipSpaces
+    _ <- string "="
+    assignedVal <- expression
+    skipSpaces
+    _ <- do
+       _ <- strSkip $ string "in"
+       spaces <- whiteSpace
+       if spaces == "" then fail "Not let" else pure ""
+    body <- expression
+    pure $ Assignment name assignedVal body
