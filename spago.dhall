@@ -2,7 +2,7 @@
 Welcome to a Spago project!
 You can edit this file as you like.
 -}
-{ name = "my-project"
+{ name = "rough"
 , dependencies =
     [ "console"
     , "effect"
@@ -10,6 +10,7 @@ You can edit this file as you like.
     , "parsing"
     , "node-readline"
     , "ordered-collections"
+    , "spec"
     ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
