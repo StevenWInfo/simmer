@@ -138,7 +138,7 @@ assignmentExpr = do
     _ <- do
        _ <- strSkip $ string "in"
        spaces <- whiteSpace
-       if spaces == "" then fail "Not let" else pure ""
+       if spaces == "" then fail "Not in" else pure ""
     body <- expressionParser
     pure $ Assignment name assignedVal body
 
@@ -183,3 +183,22 @@ infixParser = do
     skipSpaces
     rExpr <- expressionParser
     pure $ Infix lExpr name rExpr
+
+ifParser :: Parser Expression
+ifParser = do
+    _ <- try do
+       _ <- strSkip $ string "if"
+       spaces <- whiteSpace
+       if spaces == "" then fail "Not if" else pure ""
+    pred <- expressionParser
+    _ <- do
+       _ <- strSkip $ string "then"
+       spaces <- whiteSpace
+       if spaces == "" then fail "Not then" else pure ""
+    thn <- expressionParser
+    _ <- do
+       _ <- strSkip $ string "else"
+       spaces <- whiteSpace
+       if spaces == "" then fail "Not else" else pure ""
+    els <- expressionParser
+    pure $ If pred thn els

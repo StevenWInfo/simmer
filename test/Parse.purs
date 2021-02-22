@@ -10,7 +10,7 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, postfix, infixParser)
+parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -88,15 +88,21 @@ prefixParsing = describe "Test parsing prefixes" do
 
 postfixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 postfixParsing = describe "Test parsing prefixes" do
-    it "Test prefix smoke" do
-       -- Not sure I actually even want this to be a prefix operator.
+    it "Test postfix smoke" do
+       -- Not sure I actually even want this to be a postfix operator.
        runParser postfix "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
 
 infixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 infixParsing = describe "Test parsing prefixes" do
-    it "Test prefix smoke" do
-       -- Not sure I actually even want this to be a prefix operator.
+    it "Test infix smoke" do
        runParser infixParser "789 + 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
+
+ifParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+ifParsing = describe "Test parsing prefixes" do
+    it "Test if smoke" do
+       runParser ifParser "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+    it "Test if in if" do
+       runParser ifParser "if true then 123 else if false then \"abc\" else foo" `shouldEqual` Right (If (Ident "true") (Number 123.0) (If (Ident "false") (String "abc") (Ident "foo")))
 
 generalParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 generalParsing = describe "Test general parsing" do
