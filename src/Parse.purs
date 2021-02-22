@@ -117,7 +117,11 @@ stringExpr = do
     pure value
 
 identExpr :: Parser Expression
-identExpr = (Ident <<< fromChars) <$> (many nameCharacters)
+identExpr = do
+    name <- fromChars <$> many nameCharacters
+    if elem name reserved then fail msg else (pure <<< Ident $ name)
+    where
+      msg = "Using reserved name in unrecognized way"
 
 -- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
 reserved :: Array String
@@ -218,11 +222,13 @@ ifParser = do
        spaces <- whiteSpace
        if spaces == "" then fail "Not if" else pure ""
     pred <- expressionParser
+    skipSpaces
     _ <- do
        _ <- strSkip $ string "then"
        spaces <- whiteSpace
        if spaces == "" then fail "Not then" else pure ""
     thn <- expressionParser
+    skipSpaces
     _ <- do
        _ <- strSkip $ string "else"
        spaces <- whiteSpace
