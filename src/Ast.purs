@@ -13,7 +13,7 @@ data Expression
     | Call Expression (Array Expression)
     | Prefix Name Expression
     | Infix Expression Name Expression
-    | PostFix Expression Name
+    | Postfix Expression Name
     | If Expression Expression Expression
     -- A case expression?
 
@@ -27,7 +27,7 @@ instance showExpression :: Show Expression where
                  Call fn input -> "AppliedFn<" <> show fn <> ">(" <> show input <> ")"
                  Prefix op exp -> show op <> show exp
                  Infix pre op post -> show pre <> " " <> show op <> " " <> show post
-                 PostFix exp op -> show exp <> show op
+                 Postfix exp op -> show exp <> show op
                  If pred thn els -> "If " <> show pred <> " then " <> show thn <> " else " <> show els
 
 derive instance eqExpression :: Eq Expression 

@@ -3,7 +3,7 @@ module Parse where
 import Prelude
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, anyChar, alphaNum)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, anyChar, alphaNum, oneOf)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, manyTill)
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
@@ -11,10 +11,11 @@ import Data.String.Yarn (fromChars)
 import Data.Foldable (fold, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
+import Data.List.NonEmpty (toList)
 
 import Debug.Trace (spy)
 
-import Ast (Expression(..))
+import Ast (Expression(..), Name)
 
 {-
     TODO look into Text.Parsing.StringParser.Expr
@@ -66,6 +67,7 @@ exprSkip parser = (\_ -> String "") <$> skip parser
 strSkip :: Parser String -> Parser Expression
 strSkip parser = (\_ -> String "") <$> parser
 
+-- Probably should just make "-" a prefix operator
 toNumber :: Parser Number
 toNumber = do
     neg <- string "-" <|> pure ""
@@ -113,6 +115,7 @@ nameParser = do
     pure name
 
 -- Can't use `between` with mutual recursion here.
+-- Could strings be an operator like this?
 parenExpr :: Parser Expression
 parenExpr = do
     _ <- char '('
@@ -148,4 +151,35 @@ opCharacters :: Array Char
 opCharacters =
     [ '('
     , ')'
+    , '^'
+    , '*'
+    , '+'
     ]
+
+opCharParser :: Parser Char
+opCharParser = oneOf opCharacters
+
+opParser :: Parser Name
+opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
+
+prefix :: Parser Expression
+prefix = do
+    name <- opParser
+    expr <- expressionParser
+    pure $ Prefix name expr
+
+postfix :: Parser Expression
+postfix = do
+    expr <- expressionParser
+    name <- opParser
+    pure $ Postfix expr name
+
+-- Not sure if this actually works.
+infixParser :: Parser Expression
+infixParser = do
+    lExpr <- expressionParser
+    skipSpaces
+    name <- opParser
+    skipSpaces
+    rExpr <- expressionParser
+    pure $ Infix lExpr name rExpr
