@@ -10,7 +10,8 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser)
+parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser,
+    tempParse, defaultOpTable)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -23,6 +24,7 @@ parseSuite = describe "parseSuite" do
     prefixParsing
     postfixParsing
     infixParsing
+    ifParsing
     generalParsing
 
 commentWithInlineNewline :: String
@@ -125,3 +127,7 @@ generalParsing = describe "Test general parsing" do
        parse "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
     it "Test assignment smoke" do
        parse "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
+    it "Test if smoke" do
+       parse "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+    it "Test infix operator" do
+       tempParse defaultOpTable "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))

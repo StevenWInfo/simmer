@@ -3,8 +3,9 @@ module Parse where
 import Prelude
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, anyChar, alphaNum, oneOf)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, manyTill)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
+import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
 import Data.String.Yarn (fromChars)
@@ -13,7 +14,7 @@ import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
 
-import Debug.Trace (spy)
+-- import Debug.Trace (spy)
 
 import Ast (Expression(..), Name)
 
@@ -44,21 +45,47 @@ parse source = uncommented >>= runParser expressionParser
     where
       uncommented = runParser removeComments source
 
+-- Maybe should use more "try"s
 expressionParser :: Parser Expression
 expressionParser = do
     _ <- (\_ -> String "") <$> skipSpaces
     numberExpr
         <|> stringExpr
         <|> parenExpr
+        <|> ifParser
         <|> assignmentExpr
+        -- <|> prefix
+        -- <|> infixParser
+        -- <|> postfix
         <|> identExpr
     where
         toExp = (\ws -> String ws) <$> whiteSpace
+
+createInfix :: String -> Op.Operator Expression
+createInfix name = Op.Infix op Op.AssocNone
+    where
+      op = do
+             parsedName <- string name
+             pure (\l r -> Infix l parsedName r)
+
+defaultOpTable :: Op.OperatorTable Expression
+defaultOpTable =
+    [ [ createInfix "*" ]
+    , [ createInfix "+"]
+    ]
+
+temp :: Op.OperatorTable Expression -> Parser Expression
+temp opTable = Op.buildExprParser opTable expressionParser
 
 skip :: forall a. Parser a -> Parser Unit
 skip parser = do
     _ <- parser
     pure unit
+
+tempParse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
+tempParse opTable source = uncommented >>= runParser (temp opTable)
+    where
+      uncommented = runParser removeComments source
 
 -- Why did I want this again?
 exprSkip :: Parser Expression -> Parser Expression

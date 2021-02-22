@@ -16,6 +16,7 @@ data Expression
     | Postfix Expression Name
     | If Expression Expression Expression
     -- A case expression?
+    -- Want list and TagSet literals too.
 
 instance showExpression :: Show Expression where
     show e = case e of
