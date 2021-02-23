@@ -4,15 +4,16 @@ import Prelude
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String.Yarn (fromChars)
-import Data.Foldable (fold, elem)
+import Data.Foldable (fold, foldl, foldr, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
+import Data.Array (filter, (:))
 
 -- import Debug.Trace (spy)
 
@@ -40,26 +41,48 @@ removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
     where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
 
 -- Just removes comments
-parse :: String -> Either ParseError Expression
-parse source = uncommented >>= runParser expressionParser
+parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
+parse opTable source = uncommented >>= runParser (expressionParser opTable)
     where
       uncommented = runParser removeComments source
 
+
+-- I guess I've got to have some way of distinguishing between pre-, in-, and post- operators. Either limit to certain operators/characters or by spaces or something.
+
+-- I feel like this might be able to replace most of the expression parser
+-- I suppose it can't do things like Call, If, and other things with more than two arguments
+-- expressionParser :: Op.OperatorTable Expression -> Parser Expression
+-- expressionParser opTable = Op.buildExprParser opTable _?
+
+-- If I don't end up using Op.buildExprParser, then I should make a (ReaderT Op.OperatorTable Parser Expression)
+
 -- Maybe should use more "try"s
-expressionParser :: Parser Expression
-expressionParser = do
+expressionParser :: Op.OperatorTable Expression -> Parser Expression
+expressionParser opTable = do
     _ <- (\_ -> String "") <$> skipSpaces
-    numberExpr
-        <|> stringExpr
-        <|> parenExpr
-        <|> ifParser
-        <|> assignmentExpr
-        -- <|> prefix
-        -- <|> infixParser
-        -- <|> postfix
-        <|> identExpr
+    left <- prefixParser opTable
+    skipSpaces
+    maybeExpr <- optionMaybe (infixParser opTable left)
+    pure $ fromMaybe left maybeExpr
+    
+    -- Can I do operator parsing manually by putting infix and postfix stuff here?
+    -- Need to also consider function calls. Might be tricky to deal with as well. Might be simpler if roll into one solution.
+        -- If an identifier or paren group are next to something, it is considered called with that thing. Unless it's being passed into something? I guess it just depends.
     where
         toExp = (\ws -> String ws) <$> whiteSpace
+
+prefixParser :: Op.OperatorTable Expression -> Parser Expression
+prefixParser opTable = numberExpr
+    <|> stringExpr
+    <|> parenExpr
+    <|> ifParser
+    <|> assignmentExpr
+    <|> (prefix opTable)
+    <|> identExpr
+
+infixParser :: Op.OperatorTable Expression -> Expression -> Parser Expression
+infixParser opTable left = (infixOpParser opTable left)
+                        -- <|> (postFix opTable)
 
 createInfix :: String -> Op.Operator Expression
 createInfix name = Op.Infix op Op.AssocNone
@@ -74,18 +97,10 @@ defaultOpTable =
     , [ createInfix "+"]
     ]
 
-temp :: Op.OperatorTable Expression -> Parser Expression
-temp opTable = Op.buildExprParser opTable expressionParser
-
 skip :: forall a. Parser a -> Parser Unit
 skip parser = do
     _ <- parser
     pure unit
-
-tempParse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
-tempParse opTable source = uncommented >>= runParser (temp opTable)
-    where
-      uncommented = runParser removeComments source
 
 -- Why did I want this again?
 exprSkip :: Parser Expression -> Parser Expression
@@ -193,10 +208,10 @@ opCharParser = oneOf opCharacters
 opParser :: Parser Name
 opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
 
-prefix :: Parser Expression
-prefix = do
+prefix :: Op.OperatorTable Expression -> Parser Expression
+prefix opTable = do
     name <- opParser
-    expr <- expressionParser
+    expr <- expressionParser opTable
     pure $ Prefix name expr
 
 postfix :: Parser Expression
@@ -206,14 +221,22 @@ postfix = do
     pure $ Postfix expr name
 
 -- Not sure if this actually works.
-infixParser :: Parser Expression
-infixParser = do
-    lExpr <- expressionParser
+infixOpParser :: Op.OperatorTable Expression -> Expression -> Parser Expression
+infixOpParser opTable left = do
+    let toInfix op = case op of
+                        Op.Infix inOp _ -> Just inOp
+                        _ -> Nothing
+    let infixOpTable = (map toInfix) <$> opTable
+    let folder new accum = maybe accum (\x -> x: accum) new
+    let filteredOps = (foldr folder []) <$> infixOpTable
+    -- Need to figure out how to actually use it unflattened
+    let ops = foldl (<>) [] filteredOps
+
     skipSpaces
-    name <- opParser
+    createOp <- choice ops
     skipSpaces
-    rExpr <- expressionParser
-    pure $ Infix lExpr name rExpr
+    right <- expressionParser opTable
+    pure (createOp left right)
 
 ifParser :: Parser Expression
 ifParser = do
