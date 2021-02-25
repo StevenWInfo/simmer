@@ -14,6 +14,7 @@ import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
 import Data.Array (filter, (:))
+import Control.Monad.Reader.Trans (ReaderT, ask)
 
 -- import Debug.Trace (spy)
 
@@ -56,13 +57,20 @@ parse opTable source = uncommented >>= runParser (expressionParser opTable)
 
 -- If I don't end up using Op.buildExprParser, then I should make a (ReaderT Op.OperatorTable Parser Expression)
 
+type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
+
 -- Maybe should use more "try"s
-expressionParser :: Op.OperatorTable Expression -> Parser Expression
-expressionParser opTable = do
-    _ <- (\_ -> String "") <$> skipSpaces
-    left <- prefixParser opTable
+expressionParser :: ParserWithOps
+expressionParser = do
+    opTable <- ask
     skipSpaces
-    maybeExpr <- optionMaybe (infixParser opTable left)
+    --_ <- pure ((\_ -> String "") <$> skipSpaces)
+    left <- prefixParser
+    _ <- pure ((\_ -> String "") <$> skipSpaces)
+    maybeExpr <- optionMaybe (infixParser left)
+    {-
+    skipSpaces
+    -}
     pure $ fromMaybe left maybeExpr
     
     -- Can I do operator parsing manually by putting infix and postfix stuff here?
@@ -71,13 +79,13 @@ expressionParser opTable = do
     where
         toExp = (\ws -> String ws) <$> whiteSpace
 
-prefixParser :: Op.OperatorTable Expression -> Parser Expression
-prefixParser opTable = numberExpr
+prefixParser :: ParserWithOps
+prefixParser = numberExpr
     <|> stringExpr
     <|> parenExpr
     <|> ifParser
     <|> assignmentExpr
-    <|> (prefix opTable)
+    <|> prefix
     <|> identExpr
 
 infixParser :: Op.OperatorTable Expression -> Expression -> Parser Expression
@@ -162,11 +170,11 @@ nameParser = do
 
 -- Can't use `between` with mutual recursion here.
 -- Could strings be an operator like this?
-parenExpr :: Parser Expression
+parenExpr :: ParserWithOps
 parenExpr = do
-    _ <- char '('
+    _ <- pure $ char '('
     expr <- expressionParser
-    _ <- char ')'
+    _ <- pure $ char ')'
     pure $ Prefix "(" expr
 
 -- Need to limit to non-reserved things.
@@ -208,20 +216,20 @@ opCharParser = oneOf opCharacters
 opParser :: Parser Name
 opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
 
-prefix :: Op.OperatorTable Expression -> Parser Expression
+prefix :: ParserWithOps
 prefix opTable = do
     name <- opParser
     expr <- expressionParser opTable
     pure $ Prefix name expr
 
-postfix :: Parser Expression
+postfix :: ParserWithOps
 postfix = do
     expr <- expressionParser
     name <- opParser
     pure $ Postfix expr name
 
 -- Not sure if this actually works.
-infixOpParser :: Op.OperatorTable Expression -> Expression -> Parser Expression
+infixOpParser :: Expression -> ParserWithOps
 infixOpParser opTable left = do
     let toInfix op = case op of
                         Op.Infix inOp _ -> Just inOp
@@ -238,7 +246,7 @@ infixOpParser opTable left = do
     right <- expressionParser opTable
     pure (createOp left right)
 
-ifParser :: Parser Expression
+ifParser :: ParserWithOps
 ifParser = do
     _ <- try do
        _ <- strSkip $ string "if"
