@@ -1,20 +1,20 @@
 module Parse where
 
-import Prelude
+import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
-import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String.Yarn (fromChars)
 import Data.Foldable (fold, foldl, foldr, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
-import Data.Array (filter, (:))
-import Control.Monad.Reader.Trans (ReaderT, ask)
+import Data.Array ((:))
+import Control.Monad.Reader.Trans (ReaderT, ask, lift, mapReaderT, runReaderT)
 
 -- import Debug.Trace (spy)
 
@@ -43,7 +43,7 @@ removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
 
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
-parse opTable source = uncommented >>= runParser (expressionParser opTable)
+parse opTable source = uncommented >>= runParser ((runReaderT expressionParser) opTable)
     where
       uncommented = runParser removeComments source
 
@@ -63,11 +63,11 @@ type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
 expressionParser :: ParserWithOps
 expressionParser = do
     opTable <- ask
-    skipSpaces
+    lift skipSpaces
     --_ <- pure ((\_ -> String "") <$> skipSpaces)
     left <- prefixParser
-    _ <- pure ((\_ -> String "") <$> skipSpaces)
-    maybeExpr <- optionMaybe (infixParser left)
+    _ <- lift ((\_ -> String "") <$> skipSpaces)
+    maybeExpr <- mapReaderT optionMaybe (infixParser left)
     {-
     skipSpaces
     -}
@@ -79,17 +79,8 @@ expressionParser = do
     where
         toExp = (\ws -> String ws) <$> whiteSpace
 
-prefixParser :: ParserWithOps
-prefixParser = numberExpr
-    <|> stringExpr
-    <|> parenExpr
-    <|> ifParser
-    <|> assignmentExpr
-    <|> prefix
-    <|> identExpr
-
-infixParser :: Op.OperatorTable Expression -> Expression -> Parser Expression
-infixParser opTable left = (infixOpParser opTable left)
+infixParser :: Expression -> ParserWithOps
+infixParser left = (infixOpParser left)
                         -- <|> (postFix opTable)
 
 createInfix :: String -> Op.Operator Expression
@@ -172,24 +163,24 @@ nameParser = do
 -- Could strings be an operator like this?
 parenExpr :: ParserWithOps
 parenExpr = do
-    _ <- pure $ char '('
+    _ <- lift $ char '('
     expr <- expressionParser
-    _ <- pure $ char ')'
+    _ <- lift $ char ')'
     pure $ Prefix "(" expr
 
 -- Need to limit to non-reserved things.
-assignmentExpr :: Parser Expression
+assignmentExpr :: ParserWithOps
 assignmentExpr = do
-    _ <- try do
+    _ <- lift $ try do
        _ <- strSkip $ string "let"
        spaces <- whiteSpace
        if spaces == "" then fail "Not let" else pure ""
-    name <- nameParser
-    skipSpaces
-    _ <- string "="
+    name <- lift nameParser
+    lift skipSpaces
+    _ <- lift $ string "="
     assignedVal <- expressionParser
-    skipSpaces
-    _ <- do
+    lift skipSpaces
+    _ <- lift $ do
        _ <- strSkip $ string "in"
        spaces <- whiteSpace
        if spaces == "" then fail "Not in" else pure ""
@@ -216,21 +207,24 @@ opCharParser = oneOf opCharacters
 opParser :: Parser Name
 opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
 
+-- TODO Should use the operator table
+-- Also, can probably simplify with operator table.
 prefix :: ParserWithOps
-prefix opTable = do
-    name <- opParser
-    expr <- expressionParser opTable
+prefix = do
+    name <- lift $ opParser
+    expr <- expressionParser
     pure $ Prefix name expr
 
 postfix :: ParserWithOps
 postfix = do
     expr <- expressionParser
-    name <- opParser
+    name <- lift opParser
     pure $ Postfix expr name
 
 -- Not sure if this actually works.
 infixOpParser :: Expression -> ParserWithOps
-infixOpParser opTable left = do
+infixOpParser left = do
+    opTable <- ask
     let toInfix op = case op of
                         Op.Infix inOp _ -> Just inOp
                         _ -> Nothing
@@ -240,29 +234,38 @@ infixOpParser opTable left = do
     -- Need to figure out how to actually use it unflattened
     let ops = foldl (<>) [] filteredOps
 
-    skipSpaces
-    createOp <- choice ops
-    skipSpaces
-    right <- expressionParser opTable
+    lift skipSpaces
+    createOp <- lift $ choice ops
+    lift skipSpaces
+    right <- expressionParser
     pure (createOp left right)
 
 ifParser :: ParserWithOps
 ifParser = do
-    _ <- try do
+    _ <- lift $ try do
        _ <- strSkip $ string "if"
        spaces <- whiteSpace
        if spaces == "" then fail "Not if" else pure ""
     pred <- expressionParser
-    skipSpaces
-    _ <- do
+    lift skipSpaces
+    _ <- lift do
        _ <- strSkip $ string "then"
        spaces <- whiteSpace
        if spaces == "" then fail "Not then" else pure ""
     thn <- expressionParser
-    skipSpaces
-    _ <- do
+    lift skipSpaces
+    _ <- lift do
        _ <- strSkip $ string "else"
        spaces <- whiteSpace
        if spaces == "" then fail "Not else" else pure ""
     els <- expressionParser
     pure $ If pred thn els
+
+prefixParser :: ParserWithOps
+prefixParser = (lift numberExpr)
+    <|> (lift stringExpr)
+    <|> parenExpr
+    <|> ifParser
+    <|> assignmentExpr
+    <|> prefix
+    <|> (lift identExpr)
