@@ -14,7 +14,8 @@ import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
 import Data.Array ((:))
-import Control.Monad.Reader.Trans (ReaderT, ask, lift, mapReaderT, runReaderT)
+import Control.Monad.Reader.Trans (ReaderT(..), ask, lift, mapReaderT, runReaderT)
+import Control.Lazy (class Lazy, fix, defer)
 
 -- import Debug.Trace (spy)
 
@@ -59,6 +60,13 @@ parse opTable source = uncommented >>= runParser ((runReaderT expressionParser) 
 
 type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
 
+{-
+--newtype ParserWithOps = ParserWithOps ReaderT (Op.OperatorTable Expression) Parser Expression
+
+instance lazyReaderT :: Lazy ParserWithOps where
+    defer f = ReaderT (defer (runReaderT <<< f))
+    -}
+
 -- Maybe should use more "try"s
 expressionParser :: ParserWithOps
 expressionParser = do
@@ -78,6 +86,25 @@ expressionParser = do
         -- If an identifier or paren group are next to something, it is considered called with that thing. Unless it's being passed into something? I guess it just depends.
     where
         toExp = (\ws -> String ws) <$> whiteSpace
+
+{-
+prefixParser :: ParserWithOps
+prefixParser = fix $ \self -> (lift numberExpr)
+    <|> (lift stringExpr)
+    <|> parenExpr self
+    <|> ifParser
+    <|> assignmentExpr
+    <|> prefix
+    <|> (lift identExpr)
+    -}
+prefixParser :: ParserWithOps
+prefixParser = (lift numberExpr)
+    <|> (lift stringExpr)
+    <|> parenExpr prefixParser
+    <|> ifParser
+    <|> assignmentExpr
+    <|> prefix
+    <|> (lift identExpr)
 
 infixParser :: Expression -> ParserWithOps
 infixParser left = (infixOpParser left)
@@ -161,10 +188,10 @@ nameParser = do
 
 -- Can't use `between` with mutual recursion here.
 -- Could strings be an operator like this?
-parenExpr :: ParserWithOps
-parenExpr = do
+parenExpr :: ParserWithOps -> ParserWithOps
+parenExpr expParser = do
     _ <- lift $ char '('
-    expr <- expressionParser
+    expr <- expParser
     _ <- lift $ char ')'
     pure $ Prefix "(" expr
 
@@ -260,12 +287,3 @@ ifParser = do
        if spaces == "" then fail "Not else" else pure ""
     els <- expressionParser
     pure $ If pred thn els
-
-prefixParser :: ParserWithOps
-prefixParser = (lift numberExpr)
-    <|> (lift stringExpr)
-    <|> parenExpr
-    <|> ifParser
-    <|> assignmentExpr
-    <|> prefix
-    <|> (lift identExpr)
