@@ -10,8 +10,7 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser,
-    tempParse, defaultOpTable)
+parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -68,9 +67,9 @@ numberParsing = describe "Test parsing strings" do
 assignmentParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 assignmentParsing = describe "Test parsing assignment" do
     it "Test assignment smoke" do
-       (runParser assignmentExpr "let foo = 123 in foo") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+       (runParser (assignmentExpr numberExpr) "let foo = 123 in foo") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
     it "Test assignment smoke" do
-       runParser assignmentExpr "let if = 123 in foo" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
+       runParser (assignmentExpr numberExpr) "let if = 123 in foo" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
 
 identParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 identParsing = describe "Test parsing variables" do
@@ -86,48 +85,48 @@ prefixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Uni
 prefixParsing = describe "Test parsing prefixes" do
     it "Test prefix smoke" do
        -- Not sure I actually even want this to be a prefix operator.
-       runParser prefix "^123" `shouldEqual` Right (Prefix "^" (Number 123.0))
+       runParser (prefix numberExpr) "^123" `shouldEqual` Right (Prefix "^" (Number 123.0))
 
 postfixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 postfixParsing = describe "Test parsing prefixes" do
     it "Test postfix smoke" do
        -- Not sure I actually even want this to be a postfix operator.
-       runParser postfix "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
+       runParser (postfix stringExpr) "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
 
 infixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 infixParsing = describe "Test parsing prefixes" do
     it "Test infix smoke" do
-       runParser infixParser "789 + 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
+       runParser (infixParser [] numberExpr (Number 789.0)) "+ 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
 
 ifParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 ifParsing = describe "Test parsing prefixes" do
     it "Test if smoke" do
-       runParser ifParser "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
-    it "Test if in if" do
-       runParser ifParser "if true then 123 else if false then \"abc\" else foo" `shouldEqual` Right (If (Ident "true") (Number 123.0) (If (Ident "false") (String "abc") (Ident "foo")))
+       runParser (ifParser numberExpr) "if true then 123 else 789" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+    pending' "Test if in if" do
+       runParser (ifParser numberExpr) "if true then 123 else if false then 789 else 456" `shouldEqual` Right (If (Ident "true") (Number 123.0) (If (Ident "false") (String "abc") (Ident "foo")))
 
 generalParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 generalParsing = describe "Test general parsing" do
     it "Expression parser smoke test" do
-       runParser expressionParser "1" `shouldEqual` Right (Number 1.0)
+       runParser (expressionParser []) "1" `shouldEqual` Right (Number 1.0)
     it "Expression parser: strip whitespace" do
-       runParser expressionParser " 1 " `shouldEqual` Right (Number 1.0)
+       runParser (expressionParser []) " 1 " `shouldEqual` Right (Number 1.0)
     it "Parsing smoke test" do
-       parse "1" `shouldEqual` Right (Number 1.0)
+       parse [] "1" `shouldEqual` Right (Number 1.0)
     it "Parsing string smoke test" do
-       parse "\"1\"" `shouldEqual` Right (String "1")
+       parse [] "\"1\"" `shouldEqual` Right (String "1")
     it "Parsing variable smoke test" do
-       parse "foo" `shouldEqual` Right (Ident "foo")
+       parse [] "foo" `shouldEqual` Right (Ident "foo")
     -- Should this pass or fail?
     pending' "Test ident start with number" do
-       parse "37foo" `shouldEqual` Right (Ident "37foo")
+       parse [] "37foo" `shouldEqual` Right (Ident "37foo")
     it "Test assignment smoke" do
-       parse "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+       parse [] "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
     it "Test paren smoke" do
-       parse "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
+       parse [] "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
     it "Test assignment smoke" do
-       parse "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
+       parse [] "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
     it "Test if smoke" do
-       parse "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
-    it "Test infix operator" do
-       tempParse defaultOpTable "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))
+       parse [] "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+    --it "Test infix operator" do
+       --tempParse defaultOpTable "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))
