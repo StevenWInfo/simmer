@@ -14,8 +14,7 @@ import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Data.List.NonEmpty (toList)
 import Data.Array ((:))
-import Control.Monad.Reader.Trans (ReaderT(..), ask, lift, mapReaderT, runReaderT)
-import Control.Lazy (class Lazy, fix, defer)
+import Control.Lazy (fix)
 
 -- import Debug.Trace (spy)
 
@@ -24,6 +23,10 @@ import Ast (Expression(..), Name)
 {-
     TODO look into Text.Parsing.StringParser.Expr
     TODO parse importing
+
+    I'd like to clean up a lot of this code.
+    I'd like to use ReaderT to pass around the OperatorTable, but I couldn't figure out how to make a newtype of it an instance of the Lazy typeclass for `fix` to have mutual references.
+    Can simplify it a lot with OperatorTable. Might even be able to do most of it with buildExprParser.
     -}
 
 identifyString :: Parser String
@@ -44,7 +47,7 @@ removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
 
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
-parse opTable source = uncommented >>= runParser ((runReaderT expressionParser) opTable)
+parse opTable source = uncommented >>= runParser (expressionParser opTable)
     where
       uncommented = runParser removeComments source
 
@@ -58,7 +61,7 @@ parse opTable source = uncommented >>= runParser ((runReaderT expressionParser) 
 
 -- If I don't end up using Op.buildExprParser, then I should make a (ReaderT Op.OperatorTable Parser Expression)
 
-type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
+-- type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
 
 {-
 --newtype ParserWithOps = ParserWithOps ReaderT (Op.OperatorTable Expression) Parser Expression
@@ -68,14 +71,13 @@ instance lazyReaderT :: Lazy ParserWithOps where
     -}
 
 -- Maybe should use more "try"s
-expressionParser :: ParserWithOps
-expressionParser = do
-    opTable <- ask
-    lift skipSpaces
+expressionParser :: Op.OperatorTable Expression -> Parser Expression
+expressionParser opTable = fix $ \self -> do
+    skipSpaces
     --_ <- pure ((\_ -> String "") <$> skipSpaces)
-    left <- prefixParser
-    _ <- lift ((\_ -> String "") <$> skipSpaces)
-    maybeExpr <- mapReaderT optionMaybe (infixParser left)
+    left <- prefixParser opTable self
+    _ <- ((\_ -> String "") <$> skipSpaces)
+    maybeExpr <- optionMaybe (infixParser opTable self left)
     {-
     skipSpaces
     -}
@@ -97,17 +99,17 @@ prefixParser = fix $ \self -> (lift numberExpr)
     <|> prefix
     <|> (lift identExpr)
     -}
-prefixParser :: ParserWithOps
-prefixParser = (lift numberExpr)
-    <|> (lift stringExpr)
-    <|> parenExpr prefixParser
-    <|> ifParser
-    <|> assignmentExpr
-    <|> prefix
-    <|> (lift identExpr)
+prefixParser :: Op.OperatorTable Expression -> Parser Expression -> Parser Expression
+prefixParser opTable expParser = (numberExpr)
+    <|> (stringExpr)
+    <|> parenExpr expParser
+    <|> ifParser expParser
+    <|> assignmentExpr expParser
+    <|> prefix expParser
+    <|> (identExpr)
 
-infixParser :: Expression -> ParserWithOps
-infixParser left = (infixOpParser left)
+infixParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
+infixParser ops expParser left = (infixOpParser ops expParser left)
                         -- <|> (postFix opTable)
 
 createInfix :: String -> Op.Operator Expression
@@ -116,12 +118,6 @@ createInfix name = Op.Infix op Op.AssocNone
       op = do
              parsedName <- string name
              pure (\l r -> Infix l parsedName r)
-
-defaultOpTable :: Op.OperatorTable Expression
-defaultOpTable =
-    [ [ createInfix "*" ]
-    , [ createInfix "+"]
-    ]
 
 skip :: forall a. Parser a -> Parser Unit
 skip parser = do
@@ -188,30 +184,30 @@ nameParser = do
 
 -- Can't use `between` with mutual recursion here.
 -- Could strings be an operator like this?
-parenExpr :: ParserWithOps -> ParserWithOps
+parenExpr :: Parser Expression -> Parser Expression
 parenExpr expParser = do
-    _ <- lift $ char '('
+    _ <- char '('
     expr <- expParser
-    _ <- lift $ char ')'
+    _ <- char ')'
     pure $ Prefix "(" expr
 
 -- Need to limit to non-reserved things.
-assignmentExpr :: ParserWithOps
-assignmentExpr = do
-    _ <- lift $ try do
+assignmentExpr :: Parser Expression -> Parser Expression
+assignmentExpr expParser = do
+    _ <- try do
        _ <- strSkip $ string "let"
        spaces <- whiteSpace
        if spaces == "" then fail "Not let" else pure ""
-    name <- lift nameParser
-    lift skipSpaces
-    _ <- lift $ string "="
-    assignedVal <- expressionParser
-    lift skipSpaces
-    _ <- lift $ do
+    name <- nameParser
+    skipSpaces
+    _ <- string "="
+    assignedVal <- expParser
+    skipSpaces
+    _ <- do
        _ <- strSkip $ string "in"
        spaces <- whiteSpace
        if spaces == "" then fail "Not in" else pure ""
-    body <- expressionParser
+    body <- expParser
     pure $ Assignment name assignedVal body
 
 reservedOperators :: Array String
@@ -236,22 +232,21 @@ opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
 
 -- TODO Should use the operator table
 -- Also, can probably simplify with operator table.
-prefix :: ParserWithOps
-prefix = do
-    name <- lift $ opParser
-    expr <- expressionParser
+prefix :: Parser Expression -> Parser Expression
+prefix expParser = do
+    name <- opParser
+    expr <- expParser
     pure $ Prefix name expr
 
-postfix :: ParserWithOps
-postfix = do
-    expr <- expressionParser
-    name <- lift opParser
+postfix :: Parser Expression -> Parser Expression
+postfix expParser = do
+    expr <- expParser
+    name <- opParser
     pure $ Postfix expr name
 
 -- Not sure if this actually works.
-infixOpParser :: Expression -> ParserWithOps
-infixOpParser left = do
-    opTable <- ask
+infixOpParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
+infixOpParser opTable expParser left = do
     let toInfix op = case op of
                         Op.Infix inOp _ -> Just inOp
                         _ -> Nothing
@@ -261,29 +256,29 @@ infixOpParser left = do
     -- Need to figure out how to actually use it unflattened
     let ops = foldl (<>) [] filteredOps
 
-    lift skipSpaces
-    createOp <- lift $ choice ops
-    lift skipSpaces
-    right <- expressionParser
+    skipSpaces
+    createOp <- choice ops
+    skipSpaces
+    right <- expParser
     pure (createOp left right)
 
-ifParser :: ParserWithOps
-ifParser = do
-    _ <- lift $ try do
+ifParser :: Parser Expression -> Parser Expression
+ifParser expParser = do
+    _ <- try do
        _ <- strSkip $ string "if"
        spaces <- whiteSpace
        if spaces == "" then fail "Not if" else pure ""
-    pred <- expressionParser
-    lift skipSpaces
-    _ <- lift do
+    pred <- expParser
+    skipSpaces
+    _ <- do
        _ <- strSkip $ string "then"
        spaces <- whiteSpace
        if spaces == "" then fail "Not then" else pure ""
-    thn <- expressionParser
-    lift skipSpaces
-    _ <- lift do
+    thn <- expParser
+    skipSpaces
+    _ <- do
        _ <- strSkip $ string "else"
        spaces <- whiteSpace
        if spaces == "" then fail "Not else" else pure ""
-    els <- expressionParser
+    els <- expParser
     pure $ If pred thn els
