@@ -3,7 +3,7 @@ module Parse where
 import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
@@ -12,8 +12,7 @@ import Data.String.Yarn (fromChars)
 import Data.Foldable (fold, foldl, foldr, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
-import Data.List.NonEmpty (toList)
-import Data.Array ((:))
+import Data.Array ((:), catMaybes)
 import Control.Lazy (fix)
 
 -- import Debug.Trace (spy)
@@ -105,7 +104,7 @@ prefixParser opTable expParser = (numberExpr)
     <|> parenExpr expParser
     <|> ifParser expParser
     <|> assignmentExpr expParser
-    <|> prefix expParser
+    <|> prefix opTable expParser
     <|> (identExpr)
 
 infixParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
@@ -161,7 +160,7 @@ identExpr = do
       msg = "Using reserved name in unrecognized way"
 
 -- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
-reserved :: Array String
+reserved :: Array Name
 reserved =
     [ "let"
     , "in"
@@ -225,27 +224,32 @@ opCharacters =
     , '+'
     ]
 
-opCharParser :: Parser Char
-opCharParser = oneOf opCharacters
-
-opParser :: Parser Name
-opParser = (fromChars <<< toList) <$> (many1 $ opCharParser)
-
 -- TODO Should use the operator table
 -- Also, can probably simplify with operator table.
-prefix :: Parser Expression -> Parser Expression
-prefix expParser = do
-    name <- opParser
-    expr <- expParser
-    pure $ Prefix name expr
+prefix :: Op.OperatorTable Expression -> Parser Expression -> Parser Expression
+prefix opTable expParser = do
+    let prefixPred op = case op of
+                            Op.Prefix x -> Just x
+                            _ -> Nothing
+    let maybePrefixes = (map prefixPred) <$> opTable
+    let prefixes = catMaybes <$> maybePrefixes
 
+    skipSpaces
+    createOp <- choice (choice <$> prefixes)
+    skipSpaces -- ?
+
+    expr <- expParser
+    pure $ createOp expr
+
+{- TODO
 postfix :: Parser Expression -> Parser Expression
 postfix expParser = do
     expr <- expParser
     name <- opParser
     pure $ Postfix expr name
+    -}
 
--- Not sure if this actually works.
+-- TODO Actually use precedence
 infixOpParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
 infixOpParser opTable expParser left = do
     let toInfix op = case op of
