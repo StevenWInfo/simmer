@@ -3,7 +3,7 @@ module Parse where
 import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf, anyChar)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
@@ -283,3 +283,20 @@ ifParser expParser = do
        if spaces == "" then fail "Not else" else pure ""
     els <- expParser
     pure $ If pred thn els
+
+infixOp :: Op.Assoc -> String -> Op.Operator Expression
+infixOp assoc opStr = Op.Infix parser assoc
+    where
+      parser = do
+         _ <- string opStr
+         pure (\left -> \right -> Infix left opStr right)
+
+prefixOp :: String -> Op.Operator Expression
+prefixOp opStr = Op.Prefix do
+    _ <- string opStr
+    pure (\right -> Prefix opStr right)
+
+postfixOp :: String -> Op.Operator Expression
+postfixOp opStr = Op.Postfix do
+    _ <- string opStr
+    pure (\left -> Postfix left opStr)

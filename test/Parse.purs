@@ -5,12 +5,13 @@ import Effect.Exception (Error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
 import Text.Parsing.StringParser (runParser, ParseError(..))
+import Text.Parsing.StringParser.Expr as Op
 import Test.Spec (it, pending', describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser)
+parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser, infixOp)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -89,14 +90,15 @@ prefixParsing = describe "Test parsing prefixes" do
 
 postfixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 postfixParsing = describe "Test parsing prefixes" do
-    it "Test postfix smoke" do
+    pending' "Test postfix smoke" do
        -- Not sure I actually even want this to be a postfix operator.
        runParser (postfix stringExpr) "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
 
 infixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 infixParsing = describe "Test parsing prefixes" do
     it "Test infix smoke" do
-       runParser (infixParser [] numberExpr (Number 789.0)) "+ 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
+       let ops = [[infixOp Op.AssocNone "+"]]
+       runParser (infixParser ops numberExpr (Number 789.0)) "+ 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
 
 ifParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 ifParsing = describe "Test parsing prefixes" do
