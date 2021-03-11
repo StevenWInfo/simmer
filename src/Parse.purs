@@ -3,7 +3,7 @@ module Parse where
 import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf, anyChar)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
@@ -201,6 +201,7 @@ assignmentExpr expParser = do
     name <- nameParser
     skipSpaces
     _ <- string "="
+    skipSpaces
     assignedVal <- expParser
     skipSpaces
     _ <- do

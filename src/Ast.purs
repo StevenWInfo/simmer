@@ -27,8 +27,8 @@ instance showExpression :: Show Expression where
                  Ident i -> "Var(" <> show i <> ")"
                  Number n -> "Num(" <> show n <> ")"
                  String s -> "Str(" <> show s <> ")"
-                 Function params body -> "Fn" <> show params <> "<" <> show body <> ">"
-                 Assignment name expr body -> "Let(" <> show name <> ")Equals(" <> show expr <> ")In(" <> show body <> ")"
+                 Function params body -> "Fn " <> show params <> "<" <> show body <> ">"
+                 Assignment name expr body -> "Let (" <> show name <> ") Equals (" <> show expr <> ") In (" <> show body <> ")"
                  Call fn input -> "AppliedFn<" <> show fn <> ">(" <> show input <> ")"
                  Prefix op exp -> show op <> show exp
                  Infix pre op post -> show pre <> " " <> show op <> " " <> show post

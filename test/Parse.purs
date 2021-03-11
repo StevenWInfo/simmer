@@ -67,9 +67,9 @@ numberParsing = describe "Test parsing strings" do
 assignmentParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 assignmentParsing = describe "Test parsing assignment" do
     it "Test assignment smoke" do
-       (runParser (assignmentExpr numberExpr) "let foo = 123 in foo") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+       (runParser (assignmentExpr numberExpr) "let foo = 123 in 789") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Number 789.0))
     it "Test assignment smoke" do
-       runParser (assignmentExpr numberExpr) "let if = 123 in foo" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
+       runParser (assignmentExpr numberExpr) "let if = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
 
 identParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 identParsing = describe "Test parsing variables" do
@@ -101,9 +101,9 @@ infixParsing = describe "Test parsing prefixes" do
 ifParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 ifParsing = describe "Test parsing prefixes" do
     it "Test if smoke" do
-       runParser (ifParser numberExpr) "if true then 123 else 789" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+       runParser (ifParser identExpr) "if true then foo else bar" `shouldEqual` Right (If (Ident "true") (Ident "foo") (Ident "bar"))
     pending' "Test if in if" do
-       runParser (ifParser numberExpr) "if true then 123 else if false then 789 else 456" `shouldEqual` Right (If (Ident "true") (Number 123.0) (If (Ident "false") (String "abc") (Ident "foo")))
+       runParser (ifParser identExpr) "if true then foo else if false then bar else baz" `shouldEqual` Right (If (Ident "true") (Ident "foo") (If (Ident "false") (Ident "bar") (Ident "baz")))
 
 generalParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 generalParsing = describe "Test general parsing" do
