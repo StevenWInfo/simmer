@@ -241,7 +241,7 @@ prefix opTable expParser = do
     expr <- expParser
     pure $ createOp expr
 
-{- TODO
+{- TODO: It doesn't have postfix now, but maybe eventually
 postfix :: Parser Expression -> Parser Expression
 postfix expParser = do
     expr <- expParser

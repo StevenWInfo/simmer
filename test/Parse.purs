@@ -11,7 +11,7 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, postfix, infixParser, ifParser, infixOp,
+parse, identExpr, assignmentExpr, prefix, infixParser, ifParser, infixOp,
     prefixOp)
 
 -- TODO put in some tests where parsers should fail.
@@ -23,7 +23,7 @@ parseSuite = describe "parseSuite" do
     assignmentParsing
     identParsing
     prefixParsing
-    postfixParsing
+    --postfixParsing
     infixParsing
     ifParsing
     generalParsing
@@ -89,11 +89,13 @@ prefixParsing = describe "Test parsing prefixes" do
        -- Not sure I actually even want this to be a prefix operator.
        runParser (prefix [[ prefixOp "^" ]] numberExpr) "^123" `shouldEqual` Right (Prefix "^" (Number 123.0))
 
+{- It just won't have postfix operators for now.
 postfixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 postfixParsing = describe "Test parsing prefixes" do
     pending' "Test postfix smoke" do
        -- Not sure I actually even want this to be a postfix operator.
        runParser (postfix stringExpr) "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
+       -}
 
 infixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 infixParsing = describe "Test parsing prefixes" do
@@ -142,3 +144,13 @@ generalParsing = describe "Test general parsing" do
        parse ops "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))
     it "Test prefix operator" do
        parse ops "!foo" `shouldEqual` Right (Prefix "!" (Ident "foo"))
+    pending' "Test postfix operator" do
+       parse ops "foo@" `shouldEqual` Right (Postfix (Ident "foo") "!")
+    it "Testing operator precedence" do
+       parse ops "1 + 2 * 3" `shouldEqual` Right (Infix (Number 1.0) "+" (Infix (Number 2.0) "*" (Number 3.0)))
+    it "Testing operator precedence other way" do
+       parse ops "1 * 2 + 3" `shouldEqual` Right (Infix (Infix (Number 1.0) "*" (Number 2.0)) "+" (Number 3.0))
+    it "Testing embedded ifs" do
+       parse ops "if true then if false then 123 else 789 else (if true then \"foo\" else \"bar\")" `shouldEqual` Right (
+           If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Prefix "(" (If (Ident "true") (String "foo") (String "bar")))
+           )
