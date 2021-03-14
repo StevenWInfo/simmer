@@ -12,7 +12,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
 parse, identExpr, assignmentExpr, prefix, infixParser, ifParser, infixOp,
-    prefixOp)
+    prefixOp, postfixOp)
 
 -- TODO put in some tests where parsers should fail.
 parseSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -27,6 +27,7 @@ parseSuite = describe "parseSuite" do
     infixParsing
     ifParsing
     generalParsing
+    longerParsing
 
 commentWithInlineNewline :: String
 commentWithInlineNewline = "foo # new comment \n bar"
@@ -112,9 +113,10 @@ ifParsing = describe "Test parsing prefixes" do
 
 ops :: Op.OperatorTable Expression
 ops =
-    [ [ prefixOp "!" ]
-    , [ infixOp Op.AssocLeft "*" ]
-    , [ infixOp Op.AssocLeft "+" ]
+    [ [ infixOp Op.AssocRight "*" ]
+    , [ prefixOp "&", postfixOp "!" ]
+    , [ infixOp Op.AssocRight "+" ]
+    , [ infixOp Op.AssocRight "==" ]
     ]
 
 generalParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -124,28 +126,32 @@ generalParsing = describe "Test general parsing" do
     it "Expression parser: strip whitespace" do
        runParser (expressionParser []) " 1 " `shouldEqual` Right (Number 1.0)
     it "Parsing smoke test" do
-       parse [] "1" `shouldEqual` Right (Number 1.0)
+       parse ops "1" `shouldEqual` Right (Number 1.0)
     it "Parsing string smoke test" do
-       parse [] "\"1\"" `shouldEqual` Right (String "1")
+       parse ops "\"1\"" `shouldEqual` Right (String "1")
     it "Parsing variable smoke test" do
-       parse [] "foo" `shouldEqual` Right (Ident "foo")
+       parse ops "foo" `shouldEqual` Right (Ident "foo")
     -- Should this pass or fail?
     pending' "Test ident start with number" do
-       parse [] "37foo" `shouldEqual` Right (Ident "37foo")
+       parse ops "37foo" `shouldEqual` Right (Ident "37foo")
     it "Test assignment smoke" do
-       parse [] "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+       parse ops "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
+    it "Test assignment in assignment" do
+       parse ops "let foo = let bar = 123 in bar in foo" `shouldEqual` Right (Assignment "foo" (Assignment "bar" (Number 123.0) (Ident "bar")) (Ident "foo"))
     it "Test paren smoke" do
-       parse [] "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
+       parse ops "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
+    it "Test paren in paren" do
+       parse [] "((123))" `shouldEqual` Right (Prefix "(" (Prefix "(" (Number 123.0)))
     it "Test assignment smoke" do
        parse [] "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
     it "Test if smoke" do
-       parse [] "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
+       parse ops "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
     it "Test infix operator" do
        parse ops "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))
     it "Test prefix operator" do
-       parse ops "!foo" `shouldEqual` Right (Prefix "!" (Ident "foo"))
-    pending' "Test postfix operator" do
-       parse ops "foo@" `shouldEqual` Right (Postfix (Ident "foo") "!")
+       parse ops "&foo" `shouldEqual` Right (Prefix "&" (Ident "foo"))
+    it "Test postfix operator" do
+       parse ops "foo!" `shouldEqual` Right (Postfix (Ident "foo") "!")
     it "Testing operator precedence" do
        parse ops "1 + 2 * 3" `shouldEqual` Right (Infix (Number 1.0) "+" (Infix (Number 2.0) "*" (Number 3.0)))
     it "Testing operator precedence other way" do
@@ -154,3 +160,32 @@ generalParsing = describe "Test general parsing" do
        parse ops "if true then if false then 123 else 789 else (if true then \"foo\" else \"bar\")" `shouldEqual` Right (
            If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Prefix "(" (If (Ident "true") (String "foo") (String "bar")))
            )
+
+longerExample :: String
+longerExample = """
+    let foo = 1 in
+    let bar = 2 in
+    let baz = if foo + bar == 3 then
+        "abc"
+        else
+        "xyz"
+    in
+        baz
+    """
+
+longerExampleAst :: Expression
+longerExampleAst = Assignment "foo" (Number 1.0)
+    (Assignment "bar" (Number 2.0)
+        (Assignment "baz"
+            (If
+                (Infix (Infix (Ident "foo") "+" (Ident "bar")) "==" (Number 3.0))
+                (String "abc")
+                (String "xyz"))
+            (Ident "baz")
+        )
+    )
+
+longerParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+longerParsing = describe "Test longer parsing" do
+    it "Testing a longer expression" do
+       parse ops longerExample `shouldEqual` Right longerExampleAst

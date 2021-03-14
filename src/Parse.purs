@@ -4,10 +4,10 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, choice)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.String.Yarn (fromChars)
 import Data.Foldable (fold, foldl, foldr, elem)
 import Data.String.CodeUnits (singleton)
@@ -69,17 +69,14 @@ instance lazyReaderT :: Lazy ParserWithOps where
     defer f = ReaderT (defer (runReaderT <<< f))
     -}
 
+{-
 -- Maybe should use more "try"s
 expressionParser :: Op.OperatorTable Expression -> Parser Expression
 expressionParser opTable = fix $ \self -> do
     skipSpaces
-    --_ <- pure ((\_ -> String "") <$> skipSpaces)
     left <- prefixParser opTable self
     _ <- ((\_ -> String "") <$> skipSpaces)
     maybeExpr <- optionMaybe (infixParser opTable self left)
-    {-
-    skipSpaces
-    -}
     pure $ fromMaybe left maybeExpr
     
     -- Can I do operator parsing manually by putting infix and postfix stuff here?
@@ -88,16 +85,6 @@ expressionParser opTable = fix $ \self -> do
     where
         toExp = (\ws -> String ws) <$> whiteSpace
 
-{-
-prefixParser :: ParserWithOps
-prefixParser = fix $ \self -> (lift numberExpr)
-    <|> (lift stringExpr)
-    <|> parenExpr self
-    <|> ifParser
-    <|> assignmentExpr
-    <|> prefix
-    <|> (lift identExpr)
-    -}
 prefixParser :: Op.OperatorTable Expression -> Parser Expression -> Parser Expression
 prefixParser opTable expParser = (numberExpr)
     <|> (stringExpr)
@@ -106,6 +93,22 @@ prefixParser opTable expParser = (numberExpr)
     <|> assignmentExpr expParser
     <|> prefix opTable expParser
     <|> (identExpr)
+    -}
+
+factor :: Parser Expression -> Parser Expression
+factor expParser = numberExpr
+    <|> (stringExpr)
+    <|> parenExpr expParser
+    <|> ifParser expParser
+    <|> assignmentExpr expParser
+    <|> (identExpr)
+    
+expressionParser :: Op.OperatorTable Expression -> Parser Expression
+expressionParser opTable = fix $ \self -> do
+    skipSpaces
+    exp <- Op.buildExprParser opTable (factor self)
+    skipSpaces
+    pure exp
 
 infixParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
 infixParser ops expParser left = (infixOpParser ops expParser left)
@@ -241,15 +244,6 @@ prefix opTable expParser = do
     expr <- expParser
     pure $ createOp expr
 
-{- TODO: It doesn't have postfix now, but maybe eventually
-postfix :: Parser Expression -> Parser Expression
-postfix expParser = do
-    expr <- expParser
-    name <- opParser
-    pure $ Postfix expr name
-    -}
-
--- TODO Actually use precedence
 infixOpParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
 infixOpParser opTable expParser left = do
     let toInfix op = case op of
@@ -291,8 +285,10 @@ ifParser expParser = do
 infixOp :: Op.Assoc -> String -> Op.Operator Expression
 infixOp assoc opStr = Op.Infix parser assoc
     where
-      parser = do
+      parser = try $ do
+         skipSpaces
          _ <- string opStr
+         skipSpaces
          pure (\left -> \right -> Infix left opStr right)
 
 prefixOp :: String -> Op.Operator Expression
