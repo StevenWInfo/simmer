@@ -89,7 +89,7 @@ ifParsing = describe "Test parsing prefixes" do
 ops :: Op.OperatorTable Expression
 ops =
     [ [ infixOp Op.AssocRight "*" ]
-    , [ prefixOp "&", postfixOp "!" ]
+    , [ prefixOp "&", postfixOp "!", prefixOp "-" ]
     , [ infixOp Op.AssocRight "+" ]
     , [ infixOp Op.AssocRight "==" ]
     ]
@@ -109,6 +109,8 @@ generalParsing = describe "Test general parsing" do
     -- Should this pass or fail?
     pending' "Test ident start with number" do
        parse ops "37foo" `shouldEqual` Right (Ident "37foo")
+    it "Parsing negative test" do
+       parse ops "-1" `shouldEqual` Right (Prefix "-" (Number (1.0)))
     it "Test assignment smoke" do
        parse ops "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
     it "Test assignment in assignment" do
