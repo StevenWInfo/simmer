@@ -4,15 +4,14 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, choice)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.String.Yarn (fromChars)
-import Data.Foldable (fold, foldl, foldr, elem)
+import Data.Foldable (fold, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
-import Data.Array ((:), catMaybes)
 import Control.Lazy (fix)
 
 -- import Debug.Trace (spy)
@@ -20,7 +19,6 @@ import Control.Lazy (fix)
 import Ast (Expression(..), Name)
 
 {-
-    TODO look into Text.Parsing.StringParser.Expr
     TODO parse importing
 
     I'd like to clean up a lot of this code.
@@ -50,50 +48,7 @@ parse opTable source = uncommented >>= runParser (expressionParser opTable)
     where
       uncommented = runParser removeComments source
 
-
--- I guess I've got to have some way of distinguishing between pre-, in-, and post- operators. Either limit to certain operators/characters or by spaces or something.
-
--- I feel like this might be able to replace most of the expression parser
--- I suppose it can't do things like Call, If, and other things with more than two arguments
--- expressionParser :: Op.OperatorTable Expression -> Parser Expression
--- expressionParser opTable = Op.buildExprParser opTable _?
-
--- If I don't end up using Op.buildExprParser, then I should make a (ReaderT Op.OperatorTable Parser Expression)
-
 -- type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
-
-{-
---newtype ParserWithOps = ParserWithOps ReaderT (Op.OperatorTable Expression) Parser Expression
-
-instance lazyReaderT :: Lazy ParserWithOps where
-    defer f = ReaderT (defer (runReaderT <<< f))
-    -}
-
-{-
--- Maybe should use more "try"s
-expressionParser :: Op.OperatorTable Expression -> Parser Expression
-expressionParser opTable = fix $ \self -> do
-    skipSpaces
-    left <- prefixParser opTable self
-    _ <- ((\_ -> String "") <$> skipSpaces)
-    maybeExpr <- optionMaybe (infixParser opTable self left)
-    pure $ fromMaybe left maybeExpr
-    
-    -- Can I do operator parsing manually by putting infix and postfix stuff here?
-    -- Need to also consider function calls. Might be tricky to deal with as well. Might be simpler if roll into one solution.
-        -- If an identifier or paren group are next to something, it is considered called with that thing. Unless it's being passed into something? I guess it just depends.
-    where
-        toExp = (\ws -> String ws) <$> whiteSpace
-
-prefixParser :: Op.OperatorTable Expression -> Parser Expression -> Parser Expression
-prefixParser opTable expParser = (numberExpr)
-    <|> (stringExpr)
-    <|> parenExpr expParser
-    <|> ifParser expParser
-    <|> assignmentExpr expParser
-    <|> prefix opTable expParser
-    <|> (identExpr)
-    -}
 
 factor :: Parser Expression -> Parser Expression
 factor expParser = numberExpr
@@ -109,17 +64,6 @@ expressionParser opTable = fix $ \self -> do
     exp <- Op.buildExprParser opTable (factor self)
     skipSpaces
     pure exp
-
-infixParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
-infixParser ops expParser left = (infixOpParser ops expParser left)
-                        -- <|> (postFix opTable)
-
-createInfix :: String -> Op.Operator Expression
-createInfix name = Op.Infix op Op.AssocNone
-    where
-      op = do
-             parsedName <- string name
-             pure (\l r -> Infix l parsedName r)
 
 skip :: forall a. Parser a -> Parser Unit
 skip parser = do
@@ -178,7 +122,7 @@ reserved =
 nameCharacters :: Parser Char
 nameCharacters = alphaNum <|> (char '_') <|> (char '\'')
 
-nameParser :: Parser String
+nameParser :: Parser Name
 nameParser = do
     name <- fromChars <$> many nameCharacters--manyTill anyChar whiteSpace 
     _ <- if elem name reserved then fail "Tried to assign to reserved name" else pure ""
@@ -226,40 +170,6 @@ opCharacters =
     , '*'
     , '+'
     ]
-
--- TODO Should use the operator table
--- Also, can probably simplify with operator table.
-prefix :: Op.OperatorTable Expression -> Parser Expression -> Parser Expression
-prefix opTable expParser = do
-    let prefixPred op = case op of
-                            Op.Prefix x -> Just x
-                            _ -> Nothing
-    let maybePrefixes = (map prefixPred) <$> opTable
-    let prefixes = catMaybes <$> maybePrefixes
-
-    skipSpaces
-    createOp <- choice (choice <$> prefixes)
-    skipSpaces -- ?
-
-    expr <- expParser
-    pure $ createOp expr
-
-infixOpParser :: Op.OperatorTable Expression -> Parser Expression -> Expression -> Parser Expression
-infixOpParser opTable expParser left = do
-    let toInfix op = case op of
-                        Op.Infix inOp _ -> Just inOp
-                        _ -> Nothing
-    let infixOpTable = (map toInfix) <$> opTable
-    let folder new accum = maybe accum (\x -> x: accum) new
-    let filteredOps = (foldr folder []) <$> infixOpTable
-    -- Need to figure out how to actually use it unflattened
-    let ops = foldl (<>) [] filteredOps
-
-    skipSpaces
-    createOp <- choice ops
-    skipSpaces
-    right <- expParser
-    pure (createOp left right)
 
 ifParser :: Parser Expression -> Parser Expression
 ifParser expParser = do

@@ -11,7 +11,7 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
 import Parse (numberExpr, stringExpr, removeComments, expressionParser,
-parse, identExpr, assignmentExpr, prefix, infixParser, ifParser, infixOp,
+parse, identExpr, assignmentExpr, ifParser, infixOp,
     prefixOp, postfixOp)
 
 -- TODO put in some tests where parsers should fail.
@@ -22,9 +22,6 @@ parseSuite = describe "parseSuite" do
     numberParsing
     assignmentParsing
     identParsing
-    prefixParsing
-    --postfixParsing
-    infixParsing
     ifParsing
     generalParsing
     longerParsing
@@ -84,32 +81,10 @@ identParsing = describe "Test parsing variables" do
     pending' "Test ident start with number" do
        (runParser identExpr "37foo") `shouldEqual` (Right $ Ident "37foo")
 
-prefixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
-prefixParsing = describe "Test parsing prefixes" do
-    it "Test prefix smoke" do
-       -- Not sure I actually even want this to be a prefix operator.
-       runParser (prefix [[ prefixOp "^" ]] numberExpr) "^123" `shouldEqual` Right (Prefix "^" (Number 123.0))
-
-{- It just won't have postfix operators for now.
-postfixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
-postfixParsing = describe "Test parsing prefixes" do
-    pending' "Test postfix smoke" do
-       -- Not sure I actually even want this to be a postfix operator.
-       runParser (postfix stringExpr) "foo*" `shouldEqual` Right (Postfix (Ident "foo") "*")
-       -}
-
-infixParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
-infixParsing = describe "Test parsing prefixes" do
-    it "Test infix smoke" do
-       let op = [[infixOp Op.AssocNone "+"]]
-       runParser (infixParser op numberExpr (Number 789.0)) "+ 123" `shouldEqual` Right (Infix (Number 789.0) "+" (Number 123.0))
-
 ifParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 ifParsing = describe "Test parsing prefixes" do
     it "Test if smoke" do
        runParser (ifParser identExpr) "if true then foo else bar" `shouldEqual` Right (If (Ident "true") (Ident "foo") (Ident "bar"))
-    pending' "Test if in if" do
-       runParser (ifParser identExpr) "if true then foo else if false then bar else baz" `shouldEqual` Right (If (Ident "true") (Ident "foo") (If (Ident "false") (Ident "bar") (Ident "baz")))
 
 ops :: Op.OperatorTable Expression
 ops =
@@ -160,6 +135,8 @@ generalParsing = describe "Test general parsing" do
        parse ops "if true then if false then 123 else 789 else (if true then \"foo\" else \"bar\")" `shouldEqual` Right (
            If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Prefix "(" (If (Ident "true") (String "foo") (String "bar")))
            )
+    it "Test if in if" do
+       parse ops "if true then foo else if false then bar else baz" `shouldEqual` Right (If (Ident "true") (Ident "foo") (If (Ident "false") (Ident "bar") (Ident "baz")))
 
 longerExample :: String
 longerExample = """
