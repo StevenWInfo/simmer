@@ -3,7 +3,7 @@ module Interpreter where
 import Prelude
 import Effect (Effect)
 import Effect.Console (log)
-import Data.Map (Map, lookup, fromFoldable, unions)
+import Data.Map (Map, lookup, fromFoldable, unions, member, insert)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
@@ -121,6 +121,21 @@ eval :: Environment -> AST.Expression -> Effect (Either String Value)
 eval env (AST.Ident name) = case lookup name (unwrap env).values of
     Nothing -> pure $ Left "That variable is not defined."
     Just val -> pure $ Right val
+eval env (AST.Number num) = pure <<< Right $ NumberVal num
+eval env (AST.String str) = pure <<< Right $ StringVal str
+eval env (AST.Assignment name exprA exprB) =
+    if name `member` envMap
+        then (pure $ Left alreadyDefinedMsg)
+        else evalAssignment
+    where
+      envMap = (_.values $ unwrap env)
+      alreadyDefinedMsg = "Name " <> name <> " has already been defined."
+      evalAssignment = do
+         resultA <- eval env exprA
+         case resultA of
+             Left err -> pure $ Left err
+             Right valA -> eval (Environment { values: insert name valA envMap }) exprB
+
 eval env expr = do
     log "eval not finished yet."
     --pure $ Left "Not implemented"
