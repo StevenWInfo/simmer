@@ -1,18 +1,25 @@
 module Test.Interpret where
 
 import Prelude
-import Effect.Exception (Error)
-import Control.Monad.Error.Class (class MonadThrow)
-import Test.Spec (it, pending, describe, SpecT, pending')
+import Test.Spec (it, describe, Spec)
 import Test.Spec.Assertions (shouldEqual)
 import Data.Either (Either(..))
+import Data.Map (empty)
+import Effect.Class (liftEffect)
+import Effect.Aff (Aff)
 
 import Ast as AST
-import Interpreter as I
+import Interpret as I
 
-{-
-interpretSuite :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
+interpretSuite :: Spec Unit
 interpretSuite = describe "Interpreter tests" do
-    it "eval smoke test" do
-        (I.eval (AST.String "foobar")) `shouldEqual` (pure $ Right (I.String "foobar"))
-        -}
+    evalSimple
+
+emptyEnviron :: I.Environment
+emptyEnviron  = I.Environment { values: empty }
+
+evalSimple :: Spec Unit
+evalSimple = describe "Test removing comments" do
+    it "Test eval num smoke" do
+       result <- (liftEffect $ I.eval emptyEnviron (AST.Number 123.0)) :: Aff (Either String I.Value)
+       result `shouldEqual` Right (I.NumberVal 123.0)

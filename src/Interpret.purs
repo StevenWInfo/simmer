@@ -1,4 +1,4 @@
-module Interpreter where
+module Interpret where
 
 import Prelude
 import Effect (Effect)
@@ -193,12 +193,15 @@ newtype Environment = Environment
 
 derive instance newtypeEnvironment :: Newtype Environment _
 
+derive instance eqEnvironment :: Eq Environment
+
 addScope :: Environment -> Map AST.Name Value -> Either String Environment
 addScope (Environment env) defined = if (length clashes) /= 0 then clashMsg clashes else Right $ Environment { values: env.values `union` defined }
     where
       clashMsg names = Left $ "Names [ " <> (joinWith ", " names) <> " ] have already been defined."
       clashes = toUnfoldable <<< keys $ intersection env.values defined
 
+-- Should maybe remove "val" from ends. They're going to be used more than AST versions.
 data Value
     = StringVal String
     | NumberVal Number
@@ -207,16 +210,42 @@ data Value
     | TagSetVal TagSet
     | ListVal (Array Value)
 
+instance showValue :: Show Value where
+    show (StringVal s) = "Str(" <> s <> ")"
+    show (NumberVal n) = "Num(" <> show n <> ")"
+    show (TagVal t) = show t
+    show (FunctionVal l) = show l
+    show (TagSetVal ts) = show ts
+    show (ListVal l) = show l
+
+derive instance eqValue :: Eq Value
+
 newtype Tag = Tag
     { symbol :: Symbol
     , name :: AST.Name
     , value :: Value
     }
 
+derive instance eqTag :: Eq Tag
+
+instance showTag :: Show Tag where
+    show (Tag t) = "(" <> t.name <> ": " <> show t.value <> ")"
+
 newtype TagSet = TagSet (Map Symbol Value)
 
+derive newtype instance showTagSet :: Show TagSet
+derive instance eqTagSet :: Eq TagSet
+
+-- TODO people making libraries don't want to create functions like this. Need to have a good way to create functions for the language.
 newtype Lambda = Lambda
     { parameters :: Array String
     , body :: AST.Expression
     , environment :: Environment
     }
+
+-- TODO At least have some sort of hash or something. Want something better.
+instance showLambda :: Show Lambda where
+    show (Lambda l) = "fn(" <> fold l.parameters <> ")"
+
+-- TODO This is only for testing. Don't export for general use.
+derive instance eqLambda :: Eq Lambda

@@ -7,8 +7,9 @@ import Test.Spec.Runner (runSpec)
 import Test.Spec.Reporter.Console (consoleReporter)
 
 import Test.Parse (parseSuite)
+import Test.Interpret (interpretSuite)
 
 main :: Effect Unit
 main = launchAff_ $ runSpec [consoleReporter] do
-    --it "does nothing" $ pure unit
     parseSuite
+    interpretSuite
