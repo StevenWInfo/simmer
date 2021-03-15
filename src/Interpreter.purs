@@ -3,13 +3,16 @@ module Interpreter where
 import Prelude
 import Effect (Effect)
 import Effect.Console (log)
-import Data.Map (Map, lookup, fromFoldable, unions, member, insert)
+import Data.Map (Map, lookup, fromFoldable, unions, member, insert, keys, intersection, union)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
-import Data.Array (concat, fold)
+import Data.Array (concat, fold, length, zip)
+import Data.Traversable (sequence)
+import Data.String.Common (joinWith)
+import Data.Set (toUnfoldable)
 
 import Ast as AST
 import Parse (parse, infixOp, prefixOp, postfixOp)
@@ -136,10 +139,38 @@ eval env (AST.Assignment name exprA exprB) =
              Left err -> pure $ Left err
              Right valA -> eval (Environment { values: insert name valA envMap }) exprB
 
+eval env (AST.Prefix name expr) = maybe (pure $ Left "Couldn't find defined prefix") (\prefix -> callValue env prefix [ expr ]) possiblePrefix
+    where
+      possiblePrefix = lookup name (_.values $ unwrap env)
+
 eval env expr = do
     log "eval not finished yet."
     --pure $ Left "Not implemented"
     pure $ Right (StringVal "foobar")
+
+callValue :: Environment -> Value -> Array AST.Expression -> Effect (Either String Value)
+callValue env (FunctionVal lambda) exprs = callLambda env lambda exprs
+callValue _ _ _ = pure $ Left "Called a value which isn't a function."
+
+-- TODO currying
+callLambda :: Environment -> Lambda -> Array AST.Expression -> Effect (Either String Value)
+callLambda env (Lambda lambda) exprs = if (length exprs) /= (length lambda.parameters) then mismatchedResult else do
+    allResults <- sequence $ (eval env) <$> exprs
+    -- I think this just gets first error. May want to get more.
+    let possibleResults = sequence allResults
+    case possibleResults of
+        Left msg -> pure $ Left msg
+        Right inParams -> apply inParams
+    where
+      mismatchedResult = pure $ Left "Number of expected and input parameters don't match"
+      apply inParams = do
+         let zipped = zip lambda.parameters inParams
+         let paramMap = fromFoldable zipped
+         let possibleExpanded = addScope env paramMap
+         case possibleExpanded of
+             Right newEnv -> eval newEnv lambda.body
+             Left msg -> pure $ Left msg
+
 
 -- Temporarily just joins all the libraries.
 -- Clean up types
@@ -153,6 +184,7 @@ importLibs libs script = Tuple newEnv newOps
       newOps = toOpTable (fold (snd <$> libs))
 
 -- Should maybe just be Map String Value
+-- I suppose could hold operators separately which might be helpful. Combine with library?
 newtype Environment = Environment
     { values :: Map String Value
     -- Do we need this?
@@ -160,6 +192,12 @@ newtype Environment = Environment
     }
 
 derive instance newtypeEnvironment :: Newtype Environment _
+
+addScope :: Environment -> Map AST.Name Value -> Either String Environment
+addScope (Environment env) defined = if (length clashes) /= 0 then clashMsg clashes else Right $ Environment { values: env.values `union` defined }
+    where
+      clashMsg names = Left $ "Names [ " <> (joinWith ", " names) <> " ] have already been defined."
+      clashes = toUnfoldable <<< keys $ intersection env.values defined
 
 data Value
     = StringVal String
@@ -171,7 +209,7 @@ data Value
 
 newtype Tag = Tag
     { symbol :: Symbol
-    , name :: String
+    , name :: AST.Name
     , value :: Value
     }
 
