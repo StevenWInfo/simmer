@@ -139,14 +139,19 @@ eval env (AST.Assignment name exprA exprB) =
              Left err -> pure $ Left err
              Right valA -> eval (Environment { values: insert name valA envMap }) exprB
 
-eval env (AST.Prefix name expr) = maybe (pure $ Left "Couldn't find defined prefix") (\prefix -> callValue env prefix [ expr ]) possiblePrefix
-    where
-      possiblePrefix = lookup name (_.values $ unwrap env)
+eval env (AST.Prefix name expr) = callNamedValue env name [ expr ]
 
 eval env expr = do
     log "eval not finished yet."
     --pure $ Left "Not implemented"
     pure $ Right (StringVal "foobar")
+
+callNamedValue :: Environment -> String -> Array AST.Expression -> Effect (Either String Value)
+callNamedValue env valName params = maybe default callPrefix possiblePrefix
+    where
+      default = pure $ Left ("Couldn't find defined function " <> valName)
+      callPrefix prefix = callValue env prefix params
+      possiblePrefix = lookup valName (_.values $ unwrap env)
 
 callValue :: Environment -> Value -> Array AST.Expression -> Effect (Either String Value)
 callValue env (FunctionVal lambda) exprs = callLambda env lambda exprs
