@@ -23,8 +23,7 @@ data OpMeta
     | Prefix String
     | Postfix String
 
--- Is Lambda right?
-data Operator = Operator Lambda OpMeta
+data Operator = Operator Fn OpMeta
 
 newtype Operators = Operators
     { first :: Array Operator
@@ -88,7 +87,7 @@ getExpr (Operator _ opMeta) = case opMeta of
     Prefix name -> prefixOp name
     Postfix name -> postfixOp name
 
-getFn :: Operator -> Lambda
+getFn :: Operator -> Fn
 getFn (Operator fn _) = fn
 
 toOpTable :: Operators -> Op.OperatorTable AST.Expression
@@ -140,6 +139,8 @@ eval env (AST.Assignment name exprA exprB) =
              Right valA -> eval (Environment { values: insert name valA envMap }) exprB
 
 eval env (AST.Prefix name expr) = callNamedValue env name [ expr ]
+eval env (AST.Infix exprL name exprR) = callNamedValue env name [ exprL, exprR ]
+eval env (AST.Postfix expr name) = callNamedValue env name [ expr ]
 
 eval env expr = do
     log "eval not finished yet."
@@ -154,12 +155,12 @@ callNamedValue env valName params = maybe default callPrefix possiblePrefix
       possiblePrefix = lookup valName (_.values $ unwrap env)
 
 callValue :: Environment -> Value -> Array AST.Expression -> Effect (Either String Value)
-callValue env (FunctionVal lambda) exprs = callLambda env lambda exprs
+callValue env (FunctionVal fn) exprs = callFn env fn exprs
 callValue _ _ _ = pure $ Left "Called a value which isn't a function."
 
 -- TODO currying
-callLambda :: Environment -> Lambda -> Array AST.Expression -> Effect (Either String Value)
-callLambda env (Lambda lambda) exprs = if (length exprs) /= (length lambda.parameters) then mismatchedResult else do
+callFn :: Environment -> Fn -> Array AST.Expression -> Effect (Either String Value)
+callFn env (Lambda lambda) exprs = if (length exprs) /= (length lambda.parameters) then mismatchedResult else do
     allResults <- sequence $ (eval env) <$> exprs
     -- I think this just gets first error. May want to get more.
     let possibleResults = sequence allResults
@@ -176,6 +177,12 @@ callLambda env (Lambda lambda) exprs = if (length exprs) /= (length lambda.param
              Right newEnv -> eval newEnv lambda.body
              Left msg -> pure $ Left msg
 
+callFn env (Foreign externalFn) exprs = do
+    allResults <- sequence $ (eval env) <$> exprs
+    let possibleResults = sequence allResults
+    case possibleResults of
+        Left msg -> pure $ Left msg
+        Right inParams -> externalFn inParams
 
 -- Temporarily just joins all the libraries.
 -- Clean up types
@@ -211,7 +218,7 @@ data Value
     = StringVal String
     | NumberVal Number
     | TagVal Tag
-    | FunctionVal Lambda
+    | FunctionVal Fn
     | TagSetVal TagSet
     | ListVal (Array Value)
 
@@ -241,16 +248,22 @@ newtype TagSet = TagSet (Map Symbol Value)
 derive newtype instance showTagSet :: Show TagSet
 derive instance eqTagSet :: Eq TagSet
 
--- TODO people making libraries don't want to create functions like this. Need to have a good way to create functions for the language.
-newtype Lambda = Lambda
-    { parameters :: Array String
-    , body :: AST.Expression
-    , environment :: Environment
-    }
+-- Uses Array for parameters, but could potentially make polyvariadic (at least in Haskell): https://wiki.haskell.org/Varargs
+type ForeignFn = Array Value -> Effect (Either String Value)
+
+data Fn = Foreign ForeignFn | Lambda
+                              { parameters :: Array String
+                              , body :: AST.Expression
+                              , environment :: Environment
+                              }
 
 -- TODO At least have some sort of hash or something. Want something better.
-instance showLambda :: Show Lambda where
+instance showFn :: Show Fn where
     show (Lambda l) = "fn(" <> fold l.parameters <> ")"
+    show (Foreign l) = "fn(EXTERNAL)"
 
 -- TODO This is only for testing. Don't export for general use.
-derive instance eqLambda :: Eq Lambda
+--derive instance eqLambda :: Eq Fn
+instance eqFn :: Eq Fn where
+    eq (Lambda l) (Lambda r) = l == r
+    eq l r = false
