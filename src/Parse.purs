@@ -43,7 +43,7 @@ removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
     where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
 
 fnApplication :: Op.Operator Expression
-fnApplication = Op.Infix parser Op.AssocRight
+fnApplication = Op.Infix parser Op.AssocLeft
     where
       parser = try $ do
          spaces <- whiteSpace
@@ -160,7 +160,7 @@ parenExpr expParser = do
     _ <- char '('
     expr <- expParser
     _ <- char ')'
-    pure $ Prefix "(" expr
+    pure $ Call (Ident "(") expr
 
 -- Need to limit to non-reserved things.
 assignmentExpr :: Parser Expression -> Parser Expression
@@ -242,14 +242,14 @@ infixOp assoc opStr = Op.Infix parser assoc
          skipSpaces
          _ <- string opStr
          skipSpaces
-         pure (\left -> \right -> Infix left opStr right)
+         pure (\left -> \right -> Call (Call (Ident opStr) left) right)
 
 prefixOp :: String -> Op.Operator Expression
 prefixOp opStr = Op.Prefix do
     _ <- string opStr
-    pure (\right -> Prefix opStr right)
+    pure (\right -> Call (Ident opStr) right)
 
 postfixOp :: String -> Op.Operator Expression
 postfixOp opStr = Op.Postfix do
     _ <- string opStr
-    pure (\left -> Postfix left opStr)
+    pure (\left -> Call (Ident opStr) left)

@@ -2,7 +2,7 @@ module Test.Interpret where
 
 import Prelude
 import Effect (Effect)
-import Test.Spec (it, describe, Spec)
+import Test.Spec (it, describe, Spec, pending')
 import Test.Spec.Assertions (shouldEqual)
 import Data.Either (Either(..))
 import Data.Map (empty, singleton)
@@ -17,6 +17,7 @@ import Interpret as I
 interpretSuite :: Spec Unit
 interpretSuite = describe "Interpreter tests" do
     evalSimple
+    parseAndEval
 
 emptyEnviron :: I.Environment
 emptyEnviron  = I.Environment { values: empty }
@@ -56,7 +57,7 @@ twoParam = I.Foreign handleMaybe
        pure <<< Left $ "Expected two numbers."
 
 evalSimple :: Spec Unit
-evalSimple = describe "Test removing comments" do
+evalSimple = describe "Simple eval stuff" do
     it "Test eval ident smoke" do
        result <- (liftEffect $ I.eval (I.Environment { values: singleton "foo" (I.StringVal "bar") }) (AST.Ident "foo")) :: Aff (Either String I.Value)
        result `shouldEqual` Right (I.StringVal "bar")
@@ -70,11 +71,20 @@ evalSimple = describe "Test removing comments" do
        result <- (liftEffect $ I.eval emptyEnviron (AST.Assignment "Foo" (AST.Number 123.0) (AST.Number 789.0))) :: Aff (Either String I.Value)
        result `shouldEqual` Right (I.NumberVal 789.0)
     it "Test eval prefix smoke" do
-       result <- (liftEffect $ I.eval (I.Environment { values: singleton "*" (I.FunctionVal simpleFn) }) (AST.Prefix "*" (AST.String "bar")))
+       result <- (liftEffect $ I.eval (I.Environment { values: singleton "*" (I.FunctionVal simpleFn) }) (AST.Call (AST.Ident "*") (AST.String "bar")))
        result `shouldEqual` Right (I.StringVal "bar")
     it "Test eval postfix smoke" do
-       result <- (liftEffect $ I.eval (I.Environment { values: singleton "!" (I.FunctionVal simpleFn) }) (AST.Postfix (AST.String "bar") "!"))
+       result <- (liftEffect $ I.eval (I.Environment { values: singleton "!" (I.FunctionVal simpleFn) }) (AST.Call (AST.Ident "!") (AST.String "bar")))
        result `shouldEqual` Right (I.StringVal "bar")
     it "Test eval infix smoke" do
-       result <- (liftEffect $ I.eval (I.Environment { values: singleton "+" (I.FunctionVal twoParam) }) (AST.Infix (AST.Number 2.0) "+" (AST.Number 3.0)))
+       result <- (liftEffect $ I.eval (I.Environment { values: singleton "+" (I.FunctionVal twoParam) }) (AST.Call (AST.Call (AST.Ident "+") (AST.Number 2.0)) (AST.Number 3.0)))
        result `shouldEqual` Right (I.NumberVal 5.0)
+    it "Test eval with too many parameters" do
+       result <- (liftEffect $ I.eval (I.Environment { values: singleton "+" (I.FunctionVal twoParam) }) (AST.Call (AST.Call (AST.Call (AST.Ident "+") (AST.Number 2.0)) (AST.Number 3.0)) (AST.Number 3.0)))
+       result `shouldEqual` (Left "Too many parameters")
+
+parseAndEval :: Spec Unit
+parseAndEval = describe "Parsing then evaluating" do
+    pending' "Test eval ident smoke" do
+       result <- (liftEffect $ I.eval (I.Environment { values: singleton "foo" (I.StringVal "bar") }) (AST.Ident "foo")) :: Aff (Either String I.Value)
+       result `shouldEqual` Right (I.StringVal "bar")

@@ -110,41 +110,45 @@ generalParsing = describe "Test general parsing" do
     pending' "Test ident start with number" do
        parse ops "37foo" `shouldEqual` Right (Ident "37foo")
     it "Parsing negative test" do
-       parse ops "-1" `shouldEqual` Right (Prefix "-" (Number (1.0)))
+       parse ops "-1" `shouldEqual` Right (Call (Ident "-") (Number (1.0)))
     it "Test assignment smoke" do
        parse ops "let foo = 123 in foo" `shouldEqual` Right (Assignment "foo" (Number 123.0) (Ident "foo"))
     it "Test assignment in assignment" do
        parse ops "let foo = let bar = 123 in bar in foo" `shouldEqual` Right (Assignment "foo" (Assignment "bar" (Number 123.0) (Ident "bar")) (Ident "foo"))
     it "Test paren smoke" do
-       parse ops "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
+       parse ops "(123)" `shouldEqual` Right (Call (Ident "(") (Number 123.0))
     it "Test paren in paren" do
-       parse [] "((123))" `shouldEqual` Right (Prefix "(" (Prefix "(" (Number 123.0)))
+       parse [] "((123))" `shouldEqual` Right (Call (Ident "(") (Call (Ident "(") (Number 123.0)))
     it "Test nested assignment" do
-       parse [] "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
+       parse [] "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Call (Ident "(") (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
     it "Test if smoke" do
        parse ops "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
     it "Test infix operator" do
-       parse ops "123 + 456" `shouldEqual` Right (Infix (Number 123.0) "+" (Number 456.0))
+       parse ops "123 + 456" `shouldEqual` Right (Call (Call (Ident "+") (Number 123.0)) (Number 456.0))
     it "Test prefix operator" do
-       parse ops "&foo" `shouldEqual` Right (Prefix "&" (Ident "foo"))
+       parse ops "&foo" `shouldEqual` Right (Call (Ident "&") (Ident "foo"))
     it "Test postfix operator" do
-       parse ops "foo!" `shouldEqual` Right (Postfix (Ident "foo") "!")
+       parse ops "foo!" `shouldEqual` Right (Call (Ident "!") (Ident "foo"))
     it "Testing operator precedence" do
-       parse ops "1 + 2 * 3" `shouldEqual` Right (Infix (Number 1.0) "+" (Infix (Number 2.0) "*" (Number 3.0)))
+       parse ops "1 + 2 * 3" `shouldEqual` Right (Call (Call (Ident "+") (Number 1.0)) (Call (Call (Ident "*") (Number 2.0)) (Number 3.0)))
     it "Testing operator precedence other way" do
-       parse ops "1 * 2 + 3" `shouldEqual` Right (Infix (Infix (Number 1.0) "*" (Number 2.0)) "+" (Number 3.0))
+       parse ops "1 * 2 + 3" `shouldEqual` Right (Call (Call (Ident "+") (Call (Call (Ident "*") (Number 1.0)) (Number 2.0))) (Number 3.0))
     it "Testing embedded ifs" do
        parse ops "if true then if false then 123 else 789 else (if true then \"foo\" else \"bar\")" `shouldEqual` Right (
-           If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Prefix "(" (If (Ident "true") (String "foo") (String "bar")))
+           If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Call (Ident "(") (If (Ident "true") (String "foo") (String "bar")))
            )
     it "Test if in if" do
        parse ops "if true then foo else if false then bar else baz" `shouldEqual` Right (If (Ident "true") (Ident "foo") (If (Ident "false") (Ident "bar") (Ident "baz")))
     it "Test function call" do
        parse ops "foo 1" `shouldEqual` Right (Call (Ident "foo") (Number 1.0))
+    it "Test function call two" do
+       parse ops "foo 1 2" `shouldEqual` Right (Call (Call (Ident "foo") (Number 1.0)) (Number 2.0))
     it "Test reserved name" do
        parse ops "let if = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
     it "Test lambda smoke" do
        parse ops "\\a -> a" `shouldEqual` Right (Function ["a"] (Ident "a"))
+    it "Test lambda two params" do
+       parse ops "\\a b -> a" `shouldEqual` Right (Function ["a", "b"] (Ident "a"))
 
 longerExample :: String
 longerExample = """
@@ -163,7 +167,7 @@ longerExampleAst = Assignment "foo" (Number 1.0)
     (Assignment "bar" (Number 2.0)
         (Assignment "baz"
             (If
-                (Infix (Infix (Ident "foo") "+" (Ident "bar")) "==" (Number 3.0))
+                (Call (Call (Ident "==") (Call (Call (Ident "+") (Ident "foo")) (Ident "bar"))) (Number 3.0))
                 (String "abc")
                 (String "xyz"))
             (Ident "baz")

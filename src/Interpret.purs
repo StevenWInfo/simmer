@@ -5,11 +5,11 @@ import Effect (Effect)
 import Effect.Console (log)
 import Data.Map (Map, lookup, fromFoldable, unions, member, insert, keys, intersection, union)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
-import Data.Array (concat, fold, length, zip)
+import Data.Array (concat, fold, length, zip, (:))
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
@@ -163,21 +163,31 @@ eval env (AST.Assignment name exprA exprB) =
              Left err -> pure $ Left err
              Right valA -> eval (Environment { values: insert name valA envMap }) exprB
 
+{-
 eval env (AST.Prefix name expr) = callNamedValue env name [ expr ]
 eval env (AST.Infix exprL name exprR) = callNamedValue env name [ exprL, exprR ]
 eval env (AST.Postfix expr name) = callNamedValue env name [ expr ]
+    -}
+
+-- TODO I feel like if I treat functions as a functor or monad or something, I can get the function application I want, but I can't wrap my mind around it.
+-- TODO Can't do automatic currying yet. Just errors
+eval env (AST.Call body lastParamExpr) = accumulator [] (AST.Call body lastParamExpr)
+    where
+      accumulator accum (AST.Call b p) = accumulator (p : accum) (b) 
+      accumulator accum x = do
+         eitherFinalBody <- eval env x
+         case eitherFinalBody of
+                    Left err -> pure $ Left err
+                    Right finalBody -> callValue env finalBody accum
+
+
+   -- No, other way around. Enclose first call, then enclose second call.
+-- (Call (Call (first + second + 7) (secondVal)) (firstVal))
 
 eval env expr = do
     log "eval not finished yet."
     --pure $ Left "Not implemented"
     pure $ Right (StringVal "foobar")
-
-callNamedValue :: Environment -> String -> Array AST.Expression -> Effect (Either String Value)
-callNamedValue env valName params = maybe default callPrefix possiblePrefix
-    where
-      default = pure $ Left ("Couldn't find defined function " <> valName)
-      callPrefix prefix = callValue env prefix params
-      possiblePrefix = lookup valName (_.values $ unwrap env)
 
 callValue :: Environment -> Value -> Array AST.Expression -> Effect (Either String Value)
 callValue env (FunctionVal fn) exprs = callFn env fn exprs
