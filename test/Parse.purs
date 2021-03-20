@@ -67,8 +67,8 @@ numberParsing = describe "Test parsing strings" do
 assignmentParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 assignmentParsing = describe "Test parsing assignment" do
     it "Test assignment smoke" do
-       (runParser (assignmentExpr numberExpr) "let foo = 123 in 789") `shouldEqual` Right (Assignment "foo" (Number 123.0) (Number 789.0))
-    it "Test assignment smoke" do
+       (runParser (assignmentExpr identExpr) "let foo = bar in baz") `shouldEqual` Right (Assignment "foo" (Ident "bar") (Ident "baz"))
+    it "Test reserved name" do
        runParser (assignmentExpr numberExpr) "let if = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
 
 identParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
@@ -119,7 +119,7 @@ generalParsing = describe "Test general parsing" do
        parse ops "(123)" `shouldEqual` Right (Prefix "(" (Number 123.0))
     it "Test paren in paren" do
        parse [] "((123))" `shouldEqual` Right (Prefix "(" (Prefix "(" (Number 123.0)))
-    it "Test assignment smoke" do
+    it "Test nested assignment" do
        parse [] "let foo = (let bar = 123 in bar) in foo" `shouldEqual` Right (Assignment "foo" (Prefix "(" (Assignment "bar" (Number 123.0) (Ident "bar"))) (Ident "foo"))
     it "Test if smoke" do
        parse ops "if true then 123 else \"abc\"" `shouldEqual` Right (If (Ident "true") (Number 123.0) (String "abc"))
@@ -139,6 +139,12 @@ generalParsing = describe "Test general parsing" do
            )
     it "Test if in if" do
        parse ops "if true then foo else if false then bar else baz" `shouldEqual` Right (If (Ident "true") (Ident "foo") (If (Ident "false") (Ident "bar") (Ident "baz")))
+    it "Test function call" do
+       parse ops "foo 1" `shouldEqual` Right (Call (Ident "foo") (Number 1.0))
+    it "Test reserved name" do
+       parse ops "let if = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
+    it "Test lambda smoke" do
+       parse ops "\\a -> a" `shouldEqual` Right (Function ["a"] (Ident "a"))
 
 longerExample :: String
 longerExample = """

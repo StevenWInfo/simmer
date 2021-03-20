@@ -55,6 +55,20 @@ instance semigroupOperators :: Semigroup Operators where
 instance monoidOperators :: Monoid Operators where
     mempty = emptyOperators
 
+toSuper :: Operators -> SuperOperators
+toSuper regular = SuperOperators regular specialOperators
+
+data SuperOperators = SuperOperators Operators 
+    { top :: Array Operator
+    , bottom :: Array Operator
+    }
+
+instance semigroupSuperOperators :: Semigroup SuperOperators where
+    append (SuperOperators ll lr) (SuperOperators rl rr) = SuperOperators (ll <> rl) specialOperators
+
+instance monoidSuperOperators :: Monoid SuperOperators where
+    mempty = emptySuperOperators
+
 emptyOperators :: Operators
 emptyOperators = Operators
     { first: []
@@ -68,17 +82,28 @@ emptyOperators = Operators
     , ninth: []
     }
 
-toArrays :: Operators -> Array (Array Operator)
-toArrays (Operators ops) = 
-    [ ops.first
-    , ops.second
-    , ops.third
-    , ops.fourth
-    , ops.fifth
-    , ops.sixth
-    , ops.seventh
-    , ops.eighth
-    , ops.ninth
+specialOperators :: { top :: Array Operator, bottom :: Array Operator }
+specialOperators = 
+    { top: []
+    , bottom: []
+    }
+
+emptySuperOperators :: SuperOperators
+emptySuperOperators = SuperOperators emptyOperators specialOperators
+
+toArrays :: SuperOperators -> Array (Array Operator)
+toArrays (SuperOperators (Operators regular) super) = 
+    [ super.top
+    , regular.first
+    , regular.second
+    , regular.third
+    , regular.fourth
+    , regular.fifth
+    , regular.sixth
+    , regular.seventh
+    , regular.eighth
+    , regular.ninth
+    , super.bottom
     ]
 
 getExpr :: Operator -> Op.Operator AST.Expression
@@ -90,10 +115,10 @@ getExpr (Operator _ opMeta) = case opMeta of
 getFn :: Operator -> Fn
 getFn (Operator fn _) = fn
 
-toOpTable :: Operators -> Op.OperatorTable AST.Expression
+toOpTable :: SuperOperators -> Op.OperatorTable AST.Expression
 toOpTable ops = map (map getExpr) (toArrays ops)
 
-getFunctions :: Operators -> Map String Value
+getFunctions :: SuperOperators -> Map String Value
 getFunctions ops = fromFoldable (map toTup (concat (toArrays ops)))
     where
       toTup (Operator fn opMeta) = Tuple (getName opMeta) (FunctionVal fn)
@@ -191,9 +216,9 @@ importLibs :: Array Library -> String -> Tuple Environment (Op.OperatorTable AST
 importLibs libs script = Tuple newEnv newOps
     where
       getMap (Environment x) = x
-      libToMap (Tuple (Environment a) opsToMap) = unions [a.values, (getFunctions opsToMap)]
+      libToMap (Tuple (Environment a) opsToMap) = unions [a.values, (getFunctions (toSuper opsToMap))]
       newEnv = Environment { values: unions (libToMap <$> libs) }
-      newOps = toOpTable (fold (snd <$> libs))
+      newOps = toOpTable (fold ((toSuper <<< snd) <$> libs))
 
 -- Should maybe just be Map String Value
 -- I suppose could hold operators separately which might be helpful. Combine with library?
@@ -249,9 +274,11 @@ derive newtype instance showTagSet :: Show TagSet
 derive instance eqTagSet :: Eq TagSet
 
 -- Uses Array for parameters, but could potentially make polyvariadic (at least in Haskell): https://wiki.haskell.org/Varargs
-type ForeignFn = Array Value -> Effect (Either String Value)
+type TempForeignFn = Array Value -> Effect (Either String Value)
 
-data Fn = Foreign ForeignFn | Lambda
+data ForeignFn = Param Value ForeignFn | Final (Value -> Effect (Either String Value))
+
+data Fn = Foreign TempForeignFn | Lambda
                               { parameters :: Array String
                               , body :: AST.Expression
                               , environment :: Environment

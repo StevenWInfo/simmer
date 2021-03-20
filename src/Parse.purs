@@ -4,7 +4,7 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
@@ -13,8 +13,8 @@ import Data.Foldable (fold, elem)
 import Data.String.CodeUnits (singleton)
 import Data.Either (Either)
 import Control.Lazy (fix)
-
--- import Debug.Trace (spy)
+import Data.Array ((:), modifyAtIndices)
+import Data.List.NonEmpty (toUnfoldable)
 
 import Ast (Expression(..), Name)
 
@@ -42,11 +42,26 @@ removeComments :: Parser String
 removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
     where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
 
+fnApplication :: Op.Operator Expression
+fnApplication = Op.Infix parser Op.AssocRight
+    where
+      parser = try $ do
+         spaces <- whiteSpace
+         next <- lookAhead (optionMaybe identExpr)
+         case next of
+                  -- I'd like to get actual error here.
+                  Nothing -> fail "Should backtrack here."
+                  Just _ -> if spaces == "" then fail "Not fn application" else pure (\fn -> \param -> Call fn param)
+         
+
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
-parse opTable source = uncommented >>= runParser (expressionParser opTable)
+parse opTable source = uncommented >>= runParser (expressionParser modifiedTable)
     where
       uncommented = runParser removeComments source
+      addTop top = fnApplication : top
+      -- modifiedTable = modifyAtIndices [(length opTable - 1)] addTop opTable
+      modifiedTable = modifyAtIndices [0] addTop opTable
 
 -- type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
 
@@ -56,7 +71,8 @@ factor expParser = numberExpr
     <|> parenExpr expParser
     <|> ifParser expParser
     <|> assignmentExpr expParser
-    <|> (identExpr)
+    <|> (try $ lambdaExpr expParser)
+    <|> (try identExpr)
     
 expressionParser :: Op.OperatorTable Expression -> Parser Expression
 expressionParser opTable = fix $ \self -> do
@@ -99,12 +115,20 @@ stringExpr = do
     _ <- String <$> string "\""
     pure value
 
+identExprStr :: Parser String
+identExprStr = do
+    name <- fromChars <$> many1 nameCharacters
+    if elem name reserved then fail msg else pure name
+    where
+      msg = "Using reserved name in unrecognized way"
+
 identExpr :: Parser Expression
-identExpr = do
-    name <- fromChars <$> many nameCharacters
+identExpr = Ident <$> identExprStr{-do
+    name <- fromChars <$> many1 nameCharacters
     if elem name reserved then fail msg else (pure <<< Ident $ name)
     where
       msg = "Using reserved name in unrecognized way"
+      -}
 
 -- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
 reserved :: Array Name
@@ -113,6 +137,7 @@ reserved =
     , "in"
     --, "\\"
     , "if"
+    , "then"
     , "else"
     , "case"
     , "of"
@@ -146,20 +171,38 @@ assignmentExpr expParser = do
        if spaces == "" then fail "Not let" else pure ""
     name <- nameParser
     skipSpaces
-    _ <- string "="
-    skipSpaces
-    assignedVal <- expParser
-    skipSpaces
-    _ <- do
-       _ <- strSkip $ string "in"
-       spaces <- whiteSpace
-       if spaces == "" then fail "Not in" else pure ""
+    assignedVal <- between eqParser inParser expParser
     body <- expParser
     pure $ Assignment name assignedVal body
+
+    where
+      eqParser = do
+         _ <- string "="
+         skipSpaces
+      inParser = do
+        _ <- strSkip $ string "in"
+        spaces <- whiteSpace
+        if spaces == "" then fail "Not in" else pure ""
+
+justName :: Name -> Parser Name
+justName name = do
+    _ <- strSkip (string name)
+    spaces <- whiteSpace
+    if spaces == "" then fail ("Not name " <> name) else pure name
+
+lambdaExpr :: Parser Expression -> Parser Expression
+lambdaExpr expParser = do
+    back <- string "\\"
+    params <- identExprStr `endBy1` whiteSpace
+    _ <- justName "->"
+    exp <- expParser
+    pure $ Function (toUnfoldable params) exp
 
 reservedOperators :: Array String
 reservedOperators =
     [ "("
+    , "\\"
+    , "->"
     ]
 
 opCharacters :: Array Char
