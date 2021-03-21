@@ -8,19 +8,20 @@ import Data.Array (uncons)
 import Effect.Class.Console (log)
 import Data.Either (Either(..), note)
 import Text.Parsing.StringParser.Expr as Op
-import Debug.Trace (spy)
 
 import Interpret as I
+
+-- import Debug.Trace (spy)
 
 -- Could make polyvariadic, but want to initially just work with one param.
 builtinLog :: I.TempForeignFn
 builtinLog params = do
-    log $ show (spy "bar" param)
+    log $ show param
     pure <<< Right $ (I.TagVal voidTag)
     where
       param :: Either String I.Value
       param = do
-         split <- getParam (spy "foo" params)
+         split <- getParam params
          tooLargeCheck split.tail
          Right split.head
 
@@ -53,7 +54,7 @@ builtinFns :: Map String I.Value
 builtinFns = (I.FunctionVal <<< I.Foreign) <$> (fromFoldable fns)
     where
       fns =
-          [ Tuple (spy "set" "log") builtinLog 
+          [ Tuple "log" builtinLog 
           ]
 
 voidTag :: I.Tag

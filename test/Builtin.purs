@@ -20,8 +20,11 @@ builtinEval = I.eval' [ B.builtinLibrary ]
 
 builtinSimple :: Spec Unit
 builtinSimple = describe "Simple eval stuff" do
-    it "Test log smoke" do
+    it "Test log string" do
        result <- liftEffect $ builtinEval "log \"foo\""
+       result `shouldEqual` Right (I.TagVal B.voidTag)
+    it "Test log num" do
+       result <- liftEffect $ builtinEval "log 123"
        result `shouldEqual` Right (I.TagVal B.voidTag)
     it "Test add smoke" do
        result <- liftEffect $ builtinEval "2 + 3"

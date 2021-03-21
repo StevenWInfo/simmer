@@ -19,7 +19,7 @@ import Ast as AST
 import Parse (parse, infixOp, prefixOp, postfixOp)
 import Symbol (Symbol, symbol)
 
-import Debug.Trace (spy)
+-- import Debug.Trace (spy)
 
 data OpMeta
     = Infix String Op.Assoc
@@ -175,7 +175,7 @@ eval env (AST.Postfix expr name) = callNamedValue env name [ expr ]
 
 -- TODO I feel like if I treat functions as a functor or monad or something, I can get the function application I want, but I can't wrap my mind around it.
 -- TODO Can't do automatic currying yet. Just errors
-eval env (AST.Call body lastParamExpr) = spy "eval?" $ accumulator [] (AST.Call body lastParamExpr)
+eval env (AST.Call body lastParamExpr) = accumulator [] (AST.Call body lastParamExpr)
     where
       accumulator accum (AST.Call b p) = accumulator (p : accum) (b) 
       accumulator accum x = do

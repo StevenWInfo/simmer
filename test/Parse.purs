@@ -6,7 +6,7 @@ import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
 import Text.Parsing.StringParser (runParser, ParseError(..))
 import Text.Parsing.StringParser.Expr as Op
-import Test.Spec (it, pending', describe, SpecT)
+import Test.Spec (it, itOnly, pending', describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 
 import Ast (Expression(..))
@@ -149,6 +149,13 @@ generalParsing = describe "Test general parsing" do
        parse ops "\\a -> a" `shouldEqual` Right (Function ["a"] (Ident "a"))
     it "Test lambda two params" do
        parse ops "\\a b -> a" `shouldEqual` Right (Function ["a", "b"] (Ident "a"))
+    it "Test function call" do
+       parse ops "log \"foo\"" `shouldEqual` Right (Call (Ident "log") (String "foo"))
+    it "Test function call" do
+       parse ops "log 123" `shouldEqual` Right (Call (Ident "log") (Number 123.0))
+    -- It would be nice if the error actually said the character.
+    it "Test function call number" do
+       parse ops "log @123" `shouldEqual` Left (ParseError "Could not match character '\\''")
 
 longerExample :: String
 longerExample = """

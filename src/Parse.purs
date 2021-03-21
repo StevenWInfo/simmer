@@ -4,19 +4,21 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
 import Data.String.Yarn (fromChars)
 import Data.Foldable (fold, elem)
 import Data.String.CodeUnits (singleton)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Control.Lazy (fix)
 import Data.Array ((:), modifyAtIndices)
 import Data.List.NonEmpty (toUnfoldable)
 
 import Ast (Expression(..), Name)
+
+-- import Debug.Trace (spy)
 
 {-
     TODO parse importing
@@ -47,12 +49,12 @@ fnApplication = Op.Infix parser Op.AssocLeft
     where
       parser = try $ do
          spaces <- whiteSpace
-         next <- lookAhead (optionMaybe identExpr)
-         case next of
-                  -- I'd like to get actual error here.
-                  Nothing -> fail "Should backtrack here."
-                  Just _ -> if spaces == "" then fail "Not fn application" else pure (\fn -> \param -> Call fn param)
-         
+         if spaces == "" then fail "Not fn application" else pure unit
+         next <- lookAhead <<< optionMaybe <<< choice $ string <$> badStarts
+         handleNext next
+      -- I'd like to get actual error here.
+      handleNext Nothing = pure (\fn -> \param -> Call fn param)
+      handleNext _ = fail "Should backtrack here."
 
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
@@ -67,7 +69,7 @@ parse opTable source = uncommented >>= runParser (expressionParser modifiedTable
 
 factor :: Parser Expression -> Parser Expression
 factor expParser = numberExpr
-    <|> (stringExpr)
+    <|> stringExpr
     <|> parenExpr expParser
     <|> ifParser expParser
     <|> assignmentExpr expParser
@@ -118,6 +120,10 @@ stringExpr = do
 identExprStr :: Parser String
 identExprStr = do
     name <- fromChars <$> many1 nameCharacters
+    let possibleNum = runParser numberExpr name
+    case possibleNum of
+        Left _ -> pure unit
+        Right _ -> fail "Value is a number, not identifier."
     if elem name reserved then fail msg else pure name
     where
       msg = "Using reserved name in unrecognized way"
@@ -142,6 +148,17 @@ reserved =
     , "case"
     , "of"
     , "import"
+    ] <> badStarts
+
+badStarts :: Array Name
+badStarts =
+    [ "in"
+    , "then"
+    , "else"
+    , "of"
+    , "import"
+    , ")"
+    , "->"
     ]
 
 nameCharacters :: Parser Char
@@ -203,6 +220,8 @@ reservedOperators =
     [ "("
     , "\\"
     , "->"
+    , "\""
+    , ")"
     ]
 
 opCharacters :: Array Char
