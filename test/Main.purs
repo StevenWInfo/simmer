@@ -13,6 +13,7 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Test.Parse (parseSuite)
 import Test.Interpret (interpretSuite)
+import Test.Builtin (builtinSuite)
 
 import Main (runFile)
 import Interpret as I
@@ -22,6 +23,7 @@ main = launchAff_ $ runSpec [consoleReporter] do
     parseSuite
     interpretSuite
     mainSuite
+    builtinSuite
 
 mainSuite :: Spec Unit
 mainSuite = describe "Tests for Main functionality" do

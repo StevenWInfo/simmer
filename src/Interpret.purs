@@ -17,7 +17,9 @@ import Text.Parsing.StringParser (ParseError(..))
 
 import Ast as AST
 import Parse (parse, infixOp, prefixOp, postfixOp)
-import Symbol (Symbol)
+import Symbol (Symbol, symbol)
+
+import Debug.Trace (spy)
 
 data OpMeta
     = Infix String Op.Assoc
@@ -173,7 +175,7 @@ eval env (AST.Postfix expr name) = callNamedValue env name [ expr ]
 
 -- TODO I feel like if I treat functions as a functor or monad or something, I can get the function application I want, but I can't wrap my mind around it.
 -- TODO Can't do automatic currying yet. Just errors
-eval env (AST.Call body lastParamExpr) = accumulator [] (AST.Call body lastParamExpr)
+eval env (AST.Call body lastParamExpr) = spy "eval?" $ accumulator [] (AST.Call body lastParamExpr)
     where
       accumulator accum (AST.Call b p) = accumulator (p : accum) (b) 
       accumulator accum x = do
@@ -269,16 +271,24 @@ instance showValue :: Show Value where
 
 derive instance eqValue :: Eq Value
 
-newtype Tag = Tag
+data Tag = Empty | Tag
     { symbol :: Symbol
-    , name :: AST.Name
+    -- , name :: AST.Name
     , value :: Value
     }
+
+emptyTagValue :: Value
+emptyTagValue = TagVal Empty
+
+-- What about "anonymous" tags?
+newTag :: AST.Name -> Value -> Tag
+newTag name val = Tag { symbol: symbol name, value: val }
 
 derive instance eqTag :: Eq Tag
 
 instance showTag :: Show Tag where
-    show (Tag t) = "(" <> t.name <> ": " <> show t.value <> ")"
+    show Empty = "(EmptyTag: EmptyTag)"
+    show (Tag t) = "(" <> show t.symbol <> ": " <> show t.value <> ")"
 
 newtype TagSet = TagSet (Map Symbol Value)
 
