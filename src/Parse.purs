@@ -3,7 +3,7 @@ module Parse where
 import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum)
+import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
 import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
@@ -50,11 +50,12 @@ fnApplication = Op.Infix parser Op.AssocLeft
       parser = try $ do
          spaces <- whiteSpace
          if spaces == "" then fail "Not fn application" else pure unit
-         next <- lookAhead <<< optionMaybe <<< choice $ string <$> badStarts
+         next <- lookAhead <<< optionMaybe <<< choice $ placeholderEof : opParser : (string <$> badStarts)
          handleNext next
       -- I'd like to get actual error here.
       handleNext Nothing = pure (\fn -> \param -> Call fn param)
       handleNext _ = fail "Should backtrack here."
+      placeholderEof = (\_ -> "") <$> eof
 
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
@@ -222,6 +223,7 @@ reservedOperators =
     , "->"
     , "\""
     , ")"
+    , "="
     ]
 
 opCharacters :: Array Char
@@ -231,7 +233,14 @@ opCharacters =
     , '^'
     , '*'
     , '+'
+    , '='
     ]
+
+opParser :: Parser String
+opParser = do
+    let opCharParser = oneOf opCharacters
+    chars <- many1 opCharParser
+    pure $ fromChars chars
 
 ifParser :: Parser Expression -> Parser Expression
 ifParser expParser = do
