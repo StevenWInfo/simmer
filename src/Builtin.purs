@@ -16,14 +16,23 @@ import Interpret as I
 -- Could make polyvariadic, but want to initially just work with one param.
 builtinLog :: I.TempForeignFn
 builtinLog params = do
-    log $ show param
-    pure <<< Right $ (I.TagVal voidTag)
+    -- log $ logStr param
+    case param of
+        Right rParam -> do
+            log $ logStr rParam
+            pure <<< Right $ (I.TagVal voidTag)
+        otherwise -> pure otherwise
     where
       param :: Either String I.Value
       param = do
          split <- getParam params
          tooLargeCheck split.tail
          Right split.head
+      logStr (I.StringVal str) = str
+      logStr (I.NumberVal num) = show num
+      logStr (I.TagVal (I.Empty)) = "EmptyTag: EmptyTag"
+      logStr (I.TagVal (I.Tag t)) = show t.symbol <> ": " <> logStr t.value
+      logStr othwerwise = show otherwise
 
 -- Maybe making an Effect Either monad transformer would make this a bit simpler.
 -- TODO Should this concatenate?

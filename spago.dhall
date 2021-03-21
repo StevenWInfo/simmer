@@ -10,6 +10,7 @@ You can edit this file as you like.
   , "node-fs"
   , "node-readline"
   , "numbers"
+  , "optparse"
   , "ordered-collections"
   , "psci-support"
   , "purescript-yarn"
