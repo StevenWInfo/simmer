@@ -5,7 +5,7 @@ import Data.Map (Map, fromFoldable)
 import Data.Newtype (over)
 import Data.Tuple (Tuple(..))
 import Data.Array (uncons)
-import Effect.Class.Console (log)
+import Effect.Class.Console as CON
 import Data.Either (Either(..), note)
 import Text.Parsing.StringParser.Expr as Op
 
@@ -14,12 +14,12 @@ import Interpret as I
 -- import Debug.Trace (spy)
 
 -- Could make polyvariadic, but want to initially just work with one param.
-builtinLog :: I.TempForeignFn
-builtinLog params = do
+log :: I.TempForeignFn
+log params = do
     -- log $ logStr param
     case param of
         Right rParam -> do
-            log $ logStr rParam
+            CON.log $ logStr rParam
             pure <<< Right $ (I.TagVal voidTag)
         otherwise -> pure otherwise
     where
@@ -63,7 +63,7 @@ builtinFns :: Map String I.Value
 builtinFns = (I.FunctionVal <<< I.Foreign) <$> (fromFoldable fns)
     where
       fns =
-          [ Tuple "log" builtinLog 
+          [ Tuple "log" log 
           ]
 
 voidTag :: I.Tag
