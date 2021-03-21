@@ -13,6 +13,7 @@ import Data.Array (concat, fold, length, zip, (:))
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
+import Text.Parsing.StringParser (ParseError(..))
 
 import Ast as AST
 import Parse (parse, infixOp, prefixOp, postfixOp)
@@ -36,6 +37,8 @@ newtype Operators = Operators
     , eighth :: Array Operator
     , ninth :: Array Operator
     }
+
+derive instance newtypeOperators :: Newtype Operators _
 
 -- TODO should probably check for duplicates and decide how order effects it.
 -- Or just add namespaced
@@ -131,17 +134,16 @@ type Library = Tuple Environment Operators
 
 -- Not sure how to handle operators and general defined stuff quite yet.
 interpret :: Array Library -> String -> Effect Unit
-interpret libs script = do
+interpret libs script = eval' libs script *> pure unit
+
+eval' :: Array Library -> String -> Effect (Either String Value)
+eval' libs script = do
     let (Tuple env opTable) = importLibs libs script
     let parseResult = parse opTable script
         
     case parseResult of
-        Left err -> log $ show err
-        Right expr -> eval env expr *> pure unit
-
--- TODO
--- eval' :: AST.Expression -> Effect 
--- eval' x = case
+        Left (ParseError err) -> pure <<< Left $ err
+        Right expr -> eval env expr
 
 -- Not sure how to test this.
 eval :: Environment -> AST.Expression -> Effect (Either String Value)

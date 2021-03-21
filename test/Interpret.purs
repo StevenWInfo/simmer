@@ -2,14 +2,17 @@ module Test.Interpret where
 
 import Prelude
 import Effect (Effect)
-import Test.Spec (it, describe, Spec, pending')
+import Test.Spec (it, describe, Spec)
 import Test.Spec.Assertions (shouldEqual)
 import Data.Either (Either(..))
-import Data.Map (empty, singleton)
+import Data.Map (empty, singleton, fromFoldable)
 import Data.Array (uncons)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Class (liftEffect)
 import Effect.Aff (Aff)
+import Data.Tuple (Tuple(..))
+import Data.Newtype (over)
+import Text.Parsing.StringParser.Expr as Op
 
 import Ast as AST
 import Interpret as I
@@ -56,6 +59,23 @@ twoParam = I.Foreign handleMaybe
       fn _ _ = do
        pure <<< Left $ "Expected two numbers."
 
+basicEnv :: I.Environment
+basicEnv = I.Environment
+    { values: fromFoldable
+    [ Tuple "foo" (I.StringVal "bar")
+    , Tuple "one" (I.NumberVal 1.0)
+    , Tuple "id" (I.FunctionVal simpleFn)
+    ]
+    }
+
+basicOps :: I.Operators
+basicOps = over I.Operators replace I.emptyOperators 
+    where
+      replace = _ { first = [ I.Operator twoParam (I.Infix "+" Op.AssocRight) ] }
+
+basicLib :: I.Library
+basicLib = Tuple basicEnv basicOps
+
 evalSimple :: Spec Unit
 evalSimple = describe "Simple eval stuff" do
     it "Test eval ident smoke" do
@@ -85,6 +105,15 @@ evalSimple = describe "Simple eval stuff" do
 
 parseAndEval :: Spec Unit
 parseAndEval = describe "Parsing then evaluating" do
-    pending' "Test eval ident smoke" do
-       result <- (liftEffect $ I.eval (I.Environment { values: singleton "foo" (I.StringVal "bar") }) (AST.Ident "foo")) :: Aff (Either String I.Value)
+    it "Test eval' smoke" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "\"lorem\"")
+       result `shouldEqual` Right (I.StringVal "lorem")
+    it "Test eval' foo" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "foo")
        result `shouldEqual` Right (I.StringVal "bar")
+    it "Test eval' id" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "id 7")
+       result `shouldEqual` Right (I.NumberVal 7.0)
+    it "Test eval' plus" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "3 + 7")
+       result `shouldEqual` Right (I.NumberVal 10.0)
