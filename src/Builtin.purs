@@ -4,7 +4,7 @@ import Prelude
 import Data.Map (Map, fromFoldable)
 import Data.Newtype (over)
 import Data.Tuple (Tuple(..))
-import Data.Array (uncons)
+import Data.Array (uncons, index, length)
 import Effect.Class.Console as CON
 import Data.Either (Either(..), note)
 import Text.Parsing.StringParser.Expr as Op
@@ -12,6 +12,11 @@ import Text.Parsing.StringParser.Expr as Op
 import Interpret as I
 
 -- import Debug.Trace (spy)
+
+{-
+    Maybe separate into builtin and prelude stuff.
+        Want to be able to "exclude" portions of prelude.
+    -}
 
 -- Could make polyvariadic, but want to initially just work with one param.
 log :: I.TempForeignFn
@@ -25,7 +30,7 @@ log params = do
     where
       param :: Either String I.Value
       param = do
-         split <- getParam params
+         split <- popParam params
          tooLargeCheck split.tail
          Right split.head
       logStr (I.StringVal str) = str
@@ -39,19 +44,40 @@ log params = do
 -- Fields/monoids and whatnot?
 builtinAdd :: I.TempForeignFn
 builtinAdd params = pure $ do
-    split1 <- getParam params
-    split2 <- getParam split1.tail
+    split1 <- popParam params
+    split2 <- popParam split1.tail
     tooLargeCheck split2.tail
     add split1.head split2.head
 
     where
       add :: I.Value -> I.Value -> Either String I.Value
       add (I.NumberVal l) (I.NumberVal r) = Right (I.NumberVal (l + r))
-      add _ _ = Left "Expecting numbers to +"
+      add _ _ = Left "Expecting numbers to add (+)"
 
-getParam :: Array I.Value -> Either String { head :: I.Value, tail :: Array I.Value }
-getParam params = note "Fewer parameters than expected" (uncons params)
---getParam params = do
+builtinSubtract :: I.TempForeignFn
+builtinSubtract params = pure $ do
+    sizeCheck params 2
+    left <- getParam params 0
+    right <- getParam params 1
+    subtr left right
+    where
+      subtr (I.NumberVal l) (I.NumberVal r) = Right (I.NumberVal (l - r))
+      subtr _ _ = Left "Expecting numbers to subtract (-)"
+
+-- Could make a bunch of simplifying functions that take an array and return tuples of values.
+
+sizeCheck :: forall a. Array a -> Int -> Either String Unit
+sizeCheck params expected
+    | (length params) < expected = Left "Fewer params than expected"
+    | (length params) > expected = Left "More params than expected"
+    | otherwise = Right unit
+
+getParam :: forall a. Array a -> Int -> Either String a
+getParam params pos = note "Fewer parameters than expected" $ index params pos
+
+popParam :: Array I.Value -> Either String { head :: I.Value, tail :: Array I.Value }
+popParam params = note "Fewer parameters than expected" (uncons params)
+--popParam params = do
     -- if num > (length params) then Left "Fewer params than expected" else if num < (length params) then Left "More params than expected" else 
     --split <- note "Fewer parameters than expected" (uncons params)
 

@@ -14,6 +14,7 @@ import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
 import Text.Parsing.StringParser (ParseError(..))
+import Data.Int (toNumber, fromNumber)
 
 import Ast as AST
 import Parse (parse, infixOp, prefixOp, postfixOp)
@@ -316,3 +317,55 @@ instance showFn :: Show Fn where
 instance eqFn :: Eq Fn where
     eq (Lambda l) (Lambda r) = l == r
     eq l r = false
+
+class ToValue a where
+    toValue :: a -> Value
+
+instance toValueString :: ToValue String where
+    toValue = StringVal
+
+instance toValueNumber :: ToValue Number where
+    toValue = NumberVal
+
+instance toValueInt :: ToValue Int where
+    toValue = toValue <<< toNumber
+
+instance toValueTag :: ToValue Tag where
+    toValue = TagVal
+
+instance toValueFn :: ToValue Fn where
+    toValue = FunctionVal
+
+instance toValueArray :: ToValue (Array Value) where
+    toValue = ListVal
+
+class FromValue a where
+    fromValue :: Value -> Either String a
+
+instance fromValueString :: FromValue String where
+    fromValue (StringVal s) = Right s
+    fromValue _ = Left "Expected String"
+
+instance fromValueNumber :: FromValue Number where
+    fromValue (NumberVal n) = Right n
+    fromValue _ = Left "Expected Number"
+
+instance fromValueInt :: FromValue Int where
+    fromValue (NumberVal n) = case fromNumber n of
+                                  Just i -> Right i
+                                  Nothing -> Left "Got Number but expected Integer"
+    fromValue _ = Left "Expected Number that is an Integer"
+
+{- TODO Tag, Fn, and Array.
+instance fromValueString :: FromValue String where
+    fromValue (StringVal s) = Right s
+    fromValue _ = Left "Expected String"
+
+instance fromValueString :: FromValue String where
+    fromValue (StringVal s) = Right s
+    fromValue _ = Left "Expected String"
+
+instance fromValueString :: FromValue String where
+    fromValue (StringVal s) = Right s
+    fromValue _ = Left "Expected String"
+    -}
