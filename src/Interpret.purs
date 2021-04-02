@@ -429,21 +429,15 @@ fromParam arr i = do
 -}
 simpleToForeign :: forall a z. FromValue a => ToValue z => SimmerFn -> Array Value -> Effect (Either String Value)
 simpleToForeign (One fn) arr = do
-    let abc = fn :: (forall b. ToValue b => a -> Effect (Either String b))
-    -- let eFirst = (fromParam arr 0) :: forall a. FromValue a => Either String a
     let eFirst = (fromParam arr 0) :: Either String a
     case eFirst of
-        Right first -> both first-- ?foo (fn first)-- apply (applied first)
-        Left msg -> (pure $ Left msg) :: Effect (Either String Value)
+        Right first -> (map fixedToValue) <$> (fn first)
+        Left msg -> (pure $ Left msg)
 
     where
-      apply :: Effect (Either String z) -> Effect (Either String Value)
-      apply = map (map toValue)
-      applied :: a -> Effect (Either String z)
-      applied param = fn param
-      both :: a -> Effect (Either String Value)
-      --both = (apply :: forall d. ToValue d => Effect (Either String d) -> Effect (Either String Value)) <<< (applied :: forall b. ToValue b => a -> Effect (Either String b))
-      both = apply <<< applied
+      -- Thinking about it, I'm not exactly sure why this works.
+      fixedToValue :: z -> Value
+      fixedToValue = toValue
 
 {-
 simpleToForeign (Two fn) arr = do
