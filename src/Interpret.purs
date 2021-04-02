@@ -4,12 +4,13 @@ import Prelude
 import Effect (Effect)
 import Effect.Console (log)
 import Data.Map (Map, lookup, fromFoldable, unions, member, insert, keys, intersection, union)
-import Data.Either (Either(..))
+import Data.Either (Either(..), note)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
-import Data.Array (concat, fold, length, zip, (:))
+import Data.Tuple.Nested (tuple2)
+import Data.Array (concat, fold, length, zip, (:), (!!))
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
@@ -368,4 +369,95 @@ instance fromValueString :: FromValue String where
 instance fromValueString :: FromValue String where
     fromValue (StringVal s) = Right s
     fromValue _ = Left "Expected String"
+    -}
+
+
+-- Maybe this is fine. Just have them wrap the function in this. I'd rather automate that step, but it looks difficult.
+-- Rename to OneParam, TwoParam, ...
+data SimmerFn = One (forall a z. FromValue a => ToValue z => a -> Effect (Either String z))
+    -- | Two (forall a b z. FromValue a => FromValue b => ToValue z => a -> b -> Effect (Either String z))
+
+-- Maybe if I have two or three type parameters instead where two are the two different To and From Value types, superclass them with those typeclasses, and then maybe throw some functional dependencies in for good measure it will work.
+-- Or maybe, I can use phantom types instead.
+class ToSimmerFn a where
+    toSimmer :: a -> SimmerFn
+
+--instance toSimmerFnOne :: ToSimmerFn (forall a b. ToValue a => FromValue b => a -> Effect b) where
+    --toSimmer = One
+
+--foo :: forall a b. ToValue a => a -> b -
+
+--foo fn arr = 
+
+{-
+class StrReturnType r where
+    retString :: String -> r
+
+instance strReturnTypeString :: StrReturnType String where
+    retString a = a
+
+instance strReturnTypeFn :: StrReturnType (forall r. (StrReturnType r) => (Char -> r)) where
+    retString s c = retString (concat s [c])
+
+str :: (StrReturnType r) => r
+str = retString ""
+    -}
+
+-- Effect a -> (a -> Effect b)
+-- Either c a -> (a -> Either c b)
+-- Need to figure out how to "compose" these monads or something. Maybe just bite the bullet and go with monad transformer. Or maybe just ExceptT or MonadThrow.
+-- Effect (Either c a) -> (a -> Effect (Either c b))
+
+fromParam :: forall a. FromValue a => Array Value -> Int -> Either String a
+fromParam arr i = do
+    val <- foo
+    bar val
+    where
+      foo :: Either String Value
+      foo = note "Expecting at least one parameter" $ arr !! i
+      bar :: Value -> Either String a
+      bar v = fromValue v
+
+
+{-
+-- Problem might be that SimmerFn's first param doesn't necessarily match up with result from `fromParam` since I don't think that type checker can match them up.
+-- Or maybe it can't infer very much from fn
+
+-- I think maybe I have to tie the FromValue coming out of fromParam more directly to the FromValue in fn
+
+--simpleToForeign :: forall a. FromValue a => SimmerFn -> TempForeignFn
+-}
+simpleToForeign :: forall a z. FromValue a => ToValue z => SimmerFn -> Array Value -> Effect (Either String Value)
+simpleToForeign (One fn) arr = do
+    let abc = fn :: (forall b. ToValue b => a -> Effect (Either String b))
+    -- let eFirst = (fromParam arr 0) :: forall a. FromValue a => Either String a
+    let eFirst = (fromParam arr 0) :: Either String a
+    case eFirst of
+        Right first -> both first-- ?foo (fn first)-- apply (applied first)
+        Left msg -> (pure $ Left msg) :: Effect (Either String Value)
+
+    where
+      apply :: Effect (Either String z) -> Effect (Either String Value)
+      apply = map (map toValue)
+      applied :: a -> Effect (Either String z)
+      applied param = fn param
+      both :: a -> Effect (Either String Value)
+      --both = (apply :: forall d. ToValue d => Effect (Either String d) -> Effect (Either String Value)) <<< (applied :: forall b. ToValue b => a -> Effect (Either String b))
+      both = apply <<< applied
+
+{-
+simpleToForeign (Two fn) arr = do
+    let eParams = do
+                    first <- fromParam arr 0
+                    second <- fromParam arr 1
+                    pure $ tuple2 first second
+    case eParams of
+        Right (Tuple first (Tuple second unit)) -> fn first second
+        Left msg -> pure $ Left msg
+
+{-
+simpleToForeign (Two fn) = \arr -> pure do
+    first <- note "Expecting at least one parameter" $ arr !! 0
+    second <- note "Expecting at least two parameters" $ arr !! 1
+    pure $ fn first second
     -}
