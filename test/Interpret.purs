@@ -15,6 +15,7 @@ import Data.Newtype (over)
 import Effect.Class.Console (log)
 import Text.Parsing.StringParser.Expr as Op
 
+import Interface (convertFn)
 import Ast as AST
 import Interpret as I
 
@@ -26,7 +27,7 @@ interpretSuite = describe "Interpreter tests" do
 emptyEnviron :: I.Environment
 emptyEnviron  = I.Environment { values: empty }
 
-simpleFn :: I.Fn
+simpleFn :: I.SimmerFn
 simpleFn = I.Lambda
     { parameters: [ "x" ]
     , body: AST.Ident "x"
@@ -38,7 +39,7 @@ simpleFn = I.Lambda
 -- Could also just have analogous types to Rough types that are members of the class that easily conver. E.g. Purescript Number to Rough Number, etc.
 -- Could also probably use phantom types.
 -- This is still probably going to be difficult. Would a scripting and App/Lib language developed together be significantly better?
-twoParam :: I.Fn
+twoParam :: I.SimmerFn
 twoParam = I.Foreign handleMaybe
     where
       handleParams :: Array I.Value -> Maybe (Effect (Either String I.Value))
@@ -71,7 +72,7 @@ basicEnv = I.Environment
     [ Tuple "foo" (I.StringVal "bar")
     , Tuple "one" (I.NumberVal 1.0)
     , Tuple "id" (I.FunctionVal simpleFn)
-    , Tuple "logStr" (I.FunctionVal <<< I.Foreign <<< I.convertFn $ logStr)
+    , Tuple "logStr" (I.FunctionVal <<< I.Foreign <<< convertFn $ logStr)
     ]
     }
 

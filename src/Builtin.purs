@@ -11,6 +11,7 @@ import Data.Either (Either(..), note)
 import Text.Parsing.StringParser.Expr as Op
 
 import Interpret as I
+import Interface (convertFn)
 
 -- import Debug.Trace (spy)
 
@@ -43,7 +44,7 @@ log params = do
       -}
 
 log :: I.TempForeignFn
-log = I.convertFn doLog
+log = convertFn doLog
     where
       logStr (I.StringVal str) = str
       logStr (I.NumberVal num) = show num
@@ -81,7 +82,7 @@ builtinSubtract params = pure $ do
       subtr _ _ = Left "Expecting numbers to subtract (-)"
 
 builtinMultiply :: I.TempForeignFn
-builtinMultiply = I.convertFn mult
+builtinMultiply = convertFn mult
     where
       mult :: Number -> Number -> Effect (Either String Number)
       mult a b = pure $ Right (a * b)
