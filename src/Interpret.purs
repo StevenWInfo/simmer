@@ -423,7 +423,7 @@ instance convertHostFnTag :: ConvertHostFn Tag where
 instance convertHostFnTagFn :: (ConvertHostFn r) => ConvertHostFn (Tag -> r) where
     convertFn = genericFnConvertFn
 
-{- TODO Tag, Fn, and Array.
+{- TODO Fn, Array, and other future values.
 instance fromValueString :: FromValue String where
     fromValue (StringVal s) = Right s
     fromValue _ = Left "Expected String"
@@ -436,76 +436,3 @@ instance fromValueString :: FromValue String where
     fromValue (StringVal s) = Right s
     fromValue _ = Left "Expected String"
     -}
-
-
--- Maybe this is fine. Just have them wrap the function in this. I'd rather automate that step, but it looks difficult.
--- Rename to OneParam, TwoParam, ...
-data SimmerFn = One (forall a z. FromValue a => ToValue z => a -> Effect (Either String z))
-    | Two (forall a b z. FromValue a => FromValue b => ToValue z => a -> b -> Effect (Either String z))
-
--- Maybe if I have two or three type parameters instead where two are the two different To and From Value types, superclass them with those typeclasses, and then maybe throw some functional dependencies in for good measure it will work.
--- Or maybe, I can use phantom types instead.
-class ToSimmerFn a where
-    toSimmer :: a -> SimmerFn
-
---data Lorem a b c = Foo 
-
---instance toSimmerFnOne :: ToSimmerFn (forall a b. ToValue a => FromValue b => a -> Effect b) where
-    --toSimmer = One
-
---foo :: forall a b. ToValue a => a -> b -
-
---foo fn arr = 
-
-{-
-class StrReturnType r where
-    retString :: String -> r
-
-instance strReturnTypeString :: StrReturnType String where
-    retString a = a
-
-instance strReturnTypeFn :: StrReturnType (forall r. (StrReturnType r) => (Char -> r)) where
-    retString s c = retString (concat s [c])
-
-str :: (StrReturnType r) => r
-str = retString ""
-    -}
-
--- Effect a -> (a -> Effect b)
--- Either c a -> (a -> Either c b)
--- Need to figure out how to "compose" these monads or something. Maybe just bite the bullet and go with monad transformer. Or maybe just ExceptT or MonadThrow.
--- Effect (Either c a) -> (a -> Effect (Either c b))
-
-fromParam :: forall a. FromValue a => Array Value -> Int -> Either String a
-fromParam arr i = do
-    val <- note "Expecting at least one parameter" $ arr !! i
-    fromValue val
-
-
-{-
--- Problem might be that SimmerFn's first param doesn't necessarily match up with result from `fromParam` since I don't think that type checker can match them up.
--- Or maybe it can't infer very much from fn
-
--- I think maybe I have to tie the FromValue coming out of fromParam more directly to the FromValue in fn
-
--}
--- I'm not entirely sure why having the z type param makes it work, but it does.
---simpleToForeign :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn -> Array Value -> Effect (Either String Value)
-simpleToForeign :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn -> TempForeignFn
-simpleToForeign (One fn) arr = do
-    let eFirst = (fromParam arr 0) :: Either String a
-    case eFirst of
-        Right first -> (map (toValue :: z -> Value)) <$> (fn first)
-        Left msg -> (pure $ Left msg)
-
-simpleToForeign (Two fn) arr = do
-    let eParams = do
-                    first <- fromParam arr 0 :: Either String a
-                    second <- fromParam arr 1 :: Either String b
-                    pure $ tuple2 first second
-    case eParams of
-        Right params -> (map (toValue :: z -> Value)) <$> ((uncurry2 fn) params)
-        Left msg -> pure $ Left msg
-
--- foo :: SimmerFn -> TempForeignFn
--- foo fn arr = let bar = (fn :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn) in simpleToForeign bar arr
