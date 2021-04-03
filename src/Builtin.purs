@@ -20,6 +20,7 @@ import Interpret as I
     -}
 
 -- Could make polyvariadic, but want to initially just work with one param.
+{-
 log :: I.TempForeignFn
 log params = do
     -- log $ logStr param
@@ -39,6 +40,20 @@ log params = do
       logStr (I.TagVal (I.Empty)) = "EmptyTag: EmptyTag"
       logStr (I.TagVal (I.Tag t)) = show t.symbol <> ": " <> logStr t.value
       logStr othwerwise = show otherwise
+      -}
+
+log :: I.TempForeignFn
+log = I.convertFn doLog
+    where
+      logStr (I.StringVal str) = str
+      logStr (I.NumberVal num) = show num
+      logStr (I.TagVal (I.Empty)) = "EmptyTag: EmptyTag"
+      logStr (I.TagVal (I.Tag t)) = show t.symbol <> ": " <> logStr t.value
+      logStr othwerwise = show otherwise
+      doLog :: I.Value -> Effect (Either String I.Value)
+      doLog val = do
+            CON.log $ logStr val
+            pure <<< Right <<< I.TagVal $ voidTag
 
 -- Maybe making an Effect Either monad transformer would make this a bit simpler.
 -- TODO Should this concatenate?
