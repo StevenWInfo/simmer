@@ -238,12 +238,12 @@ reservedOperators =
 
 opCharacters :: Array Char
 opCharacters =
-    [ '('
-    , ')'
-    , '^'
+    [ '^'
     , '*'
     , '+'
     , '='
+    -- , '('
+    -- , ')'
     ]
 
 opParser :: Parser String

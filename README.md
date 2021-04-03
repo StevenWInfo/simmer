@@ -1,5 +1,7 @@
 # Simmer
 
+- In hindsight, I probably should have made "parenthesis" be one of the AST values. It's another "special case" but I have to handle it specially in the parse and interpret code so it probably should be a special case.
+
 ## TODO
 
 - Figure out a lot of stuff.

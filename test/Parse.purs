@@ -71,6 +71,9 @@ assignmentParsing = describe "Test parsing assignment" do
        (runParser (assignmentExpr identExpr) "let foo = bar in baz") `shouldEqual` Right (Assignment "foo" (Ident "bar") (Ident "baz"))
     it "Test reserved name" do
        runParser (assignmentExpr numberExpr) "let if = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
+    -- This gives an error which is correct, but I want a better error messsage.
+    pending' "Test paren name" do
+       runParser (assignmentExpr numberExpr) "let ( = 123 in 789" `shouldEqual` Left (ParseError "Tried to assign to reserved name")
 
 identParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 identParsing = describe "Test parsing variables" do
@@ -118,6 +121,8 @@ generalParsing = describe "Test general parsing" do
        parse ops "let foo = let bar = 123 in bar in foo" `shouldEqual` Right (Assignment "foo" (Assignment "bar" (Number 123.0) (Ident "bar")) (Ident "foo"))
     it "Test paren smoke" do
        parse ops "(123)" `shouldEqual` Right (Call (Ident "(") (Number 123.0))
+    it "Test paren add" do
+       parse ops "(123 + 456)" `shouldEqual` Right (Call (Ident "(") (Call (Call (Ident "+") (Number 123.0)) (Number 456.0)))
     it "Test paren in paren" do
        parse [] "((123))" `shouldEqual` Right (Call (Ident "(") (Call (Ident "(") (Number 123.0)))
     it "Test nested assignment" do
@@ -134,6 +139,8 @@ generalParsing = describe "Test general parsing" do
        parse ops "1 + 2 * 3" `shouldEqual` Right (Call (Call (Ident "+") (Number 1.0)) (Call (Call (Ident "*") (Number 2.0)) (Number 3.0)))
     it "Testing operator precedence other way" do
        parse ops "1 * 2 + 3" `shouldEqual` Right (Call (Call (Ident "+") (Call (Call (Ident "*") (Number 1.0)) (Number 2.0))) (Number 3.0))
+    it "Testing operator precedence with parens" do
+       parse ops "(1 + 2) * 3" `shouldEqual` Right (Call (Call (Ident "*") (Call (Ident "(") (Call (Call (Ident "+") (Number 1.0)) (Number 2.0)))) (Number 3.0))
     it "Testing embedded ifs" do
        parse ops "if true then if false then 123 else 789 else (if true then \"foo\" else \"bar\")" `shouldEqual` Right (
            If (Ident "true") (If (Ident "false") (Number 123.0) (Number 789.0)) (Call (Ident "(") (If (Ident "true") (String "foo") (String "bar")))
@@ -154,6 +161,8 @@ generalParsing = describe "Test general parsing" do
        parse ops "log \"foo\"" `shouldEqual` Right (Call (Ident "log") (String "foo"))
     it "Test function call" do
        parse ops "log 123" `shouldEqual` Right (Call (Ident "log") (Number 123.0))
+    it "Test function with paren" do
+       parse ops "log (1 + 2)" `shouldEqual` Right (Call (Ident "log") (Call (Ident "(") (Call (Call (Ident "+") (Number 1.0)) (Number 2.0))))
     -- It would be nice if the error actually said the character.
     it "Test function call number" do
        parse ops "log @123" `shouldEqual` Left (ParseError "Could not match character '\\''")
@@ -161,6 +170,8 @@ generalParsing = describe "Test general parsing" do
        parse ops "[2, 3, 5]" `shouldEqual` Right (List [Number 2.0, Number 3.0, Number 5.0])
     it "Test empty function call" do
        parse ops "foo!" `shouldEqual` Right (EmptyCall (Ident "foo"))
+    it "Test assign and apply function" do
+       parse ops "let foo = log in foo 1" `shouldEqual` Right (Assignment "foo" (Ident "log") (Call (Ident "foo") (Number 1.0)))
 
 
 longerExample :: String
@@ -187,7 +198,24 @@ longerExampleAst = Assignment "foo" (Number 1.0)
         )
     )
 
+longerExample2 :: String
+longerExample2 = """
+    let a = random! in
+    let b = random! in
+    log (1 + 2)
+    """
+
+longerExampleAst2 :: Expression
+longerExampleAst2 =
+    (Assignment "a" (EmptyCall (Ident "random"))
+        (Assignment "b" (EmptyCall (Ident "random"))
+            (Call (Ident "log") (Call (Ident "(") (Call (Call (Ident "+") (Number 1.0)) (Number 2.0))))
+            )
+            )
+
 longerParsing :: forall g m. Monad m => MonadThrow Error g => SpecT g Unit m Unit
 longerParsing = describe "Test longer parsing" do
     it "Testing a longer expression" do
        parse ops longerExample `shouldEqual` Right longerExampleAst
+    it "Testing a longer expression 2" do
+       parse ops longerExample2 `shouldEqual` Right longerExampleAst2

@@ -2,7 +2,6 @@ module Interpret where
 
 import Prelude
 import Effect (Effect)
-import Effect.Console (log)
 import Data.Map (Map, lookup, fromFoldable, unions, member, insert, keys, intersection, union)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -173,6 +172,10 @@ eval env (AST.Infix exprL name exprR) = callNamedValue env name [ exprL, exprR ]
 eval env (AST.Postfix expr name) = callNamedValue env name [ expr ]
     -}
 
+-- Special case for left paren to handle parenthesis correctly.
+-- Could and maybe should have made a special AST value for it, but this also works.
+eval env (AST.Call (AST.Ident paren) inner) | paren == "(" = eval env inner
+
 -- TODO I feel like if I treat functions as a functor or monad or something, I can get the function application I want, but I can't wrap my mind around it.
 -- TODO Can't do automatic currying yet. Just errors
 eval env (AST.Call body lastParamExpr) = accumulator [] (AST.Call body lastParamExpr)
@@ -194,9 +197,7 @@ eval env (AST.EmptyCall body) = do
 -- (Call (Call (first + second + 7) (secondVal)) (firstVal))
 
 eval env expr = do
-    log "eval not finished yet."
-    --pure $ Left "Not implemented"
-    pure $ Right (StringVal "foobar")
+    pure $ Left "Not implemented"
 
 callValue :: Environment -> Value -> Array AST.Expression -> Effect (Either String Value)
 callValue env (FunctionVal fn) exprs = callFn env fn exprs
@@ -229,12 +230,12 @@ callFn env (Foreign externalFn) exprs = do
         Right inParams -> externalFn inParams
 
 -- Temporarily just joins all the libraries.
+-- If there are duplicate keys, only the left most is kept.
 -- Clean up types
 -- This should be more complicated to namespace things properly and whatnot.
 importLibs :: Array Library -> String -> Tuple Environment (Op.OperatorTable AST.Expression)
 importLibs libs script = Tuple newEnv newOps
     where
-      getMap (Environment x) = x
       libToMap (Tuple (Environment a) opsToMap) = unions [a.values, (getFunctions (toSuper opsToMap))]
       newEnv = Environment { values: unions (libToMap <$> libs) }
       newOps = toOpTable (fold ((toSuper <<< snd) <$> libs))

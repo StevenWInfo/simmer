@@ -137,3 +137,9 @@ parseAndEval = describe "Parsing then evaluating" do
     it "Test eval' logLorem. Should also say lorem above this test" do
        result <- (liftEffect $ I.eval' [ basicLib ] "logLorem!")
        result `shouldEqual` Right (I.StringVal "lorem")
+    it "Test plus in paren" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "(3 + 7)")
+       result `shouldEqual` Right (I.NumberVal 10.0)
+    it "Test id on paren" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "id (3 + 7)")
+       result `shouldEqual` Right (I.NumberVal 10.0)
