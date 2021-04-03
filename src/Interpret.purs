@@ -9,8 +9,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
-import Data.Tuple.Nested (tuple2, uncurry2)
-import Data.Array (concat, fold, length, zip, (:), (!!), uncons)
+import Data.Array (concat, fold, length, zip, (:), uncons)
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
@@ -292,6 +291,7 @@ instance showTag :: Show Tag where
     show Empty = "(EmptyTag: EmptyTag)"
     show (Tag t) = "(" <> show t.symbol <> ": " <> show t.value <> ")"
 
+-- Not sure this really needs to be a newtype.
 newtype TagSet = TagSet (Map Symbol Value)
 
 derive newtype instance showTagSet :: Show TagSet
@@ -340,8 +340,20 @@ instance toValueFn :: ToValue Fn where
 instance toValueArray :: ToValue (Array Value) where
     toValue = ListVal
 
+instance toValueValue :: ToValue Value where
+    toValue = identity
+
+instance toValueTagSet :: ToValue TagSet where
+    toValue = TagSetVal
+
+instance toValueTagMap :: ToValue (Map Symbol Value) where
+    toValue = TagSetVal <<< TagSet
+
 class FromValue a where
     fromValue :: Value -> Either String a
+
+instance fromValueValue :: FromValue Value where
+    fromValue = Right
 
 instance fromValueString :: FromValue String where
     fromValue (StringVal s) = Right s
@@ -360,7 +372,27 @@ instance fromValueInt :: FromValue Int where
 instance fromValueTag :: FromValue Tag where
     fromValue (TagVal t) = Right t
     fromValue _ = Left "Expected Tag"
+ 
+instance fromValueList :: (FromValue a) => FromValue (Array a) where
+    fromValue (ListVal l) = sequence $ map fromValue l
+    fromValue _ = Left "Expected List"
 
+instance fromValueTagSet :: FromValue TagSet where
+    fromValue (TagSetVal ts) = Right ts
+    fromValue _ = Left "Expected TagSet"
+
+instance fromValueTagMap :: FromValue (Map Symbol Value) where
+    fromValue (TagSetVal (TagSet tm)) = Right tm
+    fromValue _ = Left "Expected TagSet"
+-- TODO fromValueTagSet
+
+{- TODO fromValueFunctionVal
+    Not sure how to do fromValueFn
+    I would like to convert directly to purescript function, but the types probably make that difficult
+    Perhaps have the type be `Array Value -> Effect (Either String Value)` and convert `Fn` to that type. Eval lambda.
+    -}
+
+-- Shout out to the following StackOverflow Q/A that helped create this class: https://stackoverflow.com/questions/18154615/lowering-functions-to-an-embedded-language
 class ConvertHostFn r where
     convertFn :: r -> Array Value -> Effect (Either String Value)
 
@@ -423,16 +455,8 @@ instance convertHostFnTag :: ConvertHostFn Tag where
 instance convertHostFnTagFn :: (ConvertHostFn r) => ConvertHostFn (Tag -> r) where
     convertFn = genericFnConvertFn
 
-{- TODO Fn, Array, and other future values.
-instance fromValueString :: FromValue String where
-    fromValue (StringVal s) = Right s
-    fromValue _ = Left "Expected String"
+instance convertHostFnValue :: ConvertHostFn Value where
+    convertFn = genericValueConvertFn
 
-instance fromValueString :: FromValue String where
-    fromValue (StringVal s) = Right s
-    fromValue _ = Left "Expected String"
-
-instance fromValueString :: FromValue String where
-    fromValue (StringVal s) = Right s
-    fromValue _ = Left "Expected String"
-    -}
+instance convertHostFnValueFn :: (ConvertHostFn r) => ConvertHostFn (Value -> r) where
+    convertFn = genericFnConvertFn
