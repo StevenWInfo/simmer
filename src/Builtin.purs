@@ -87,16 +87,11 @@ builtinMultiply = convertFn mult
       mult :: Number -> Number -> Effect (Either String Number)
       mult a b = pure $ Right (a * b)
 
-{-
-builtinNegative :: I.TempForeignFn
-builtinNegative = I.convertFn negative
-    where
-      negative :: Number -> Effect (Either String Number)
-      negative a = pure $ Right (-a)
-      -}
+-- Have to limit the type to number
+negateNum :: Number -> Number
+negateNum = negate
 
--- Could make a bunch of simplifying functions that take an array and return tuples of values.
-
+-- May not really need these anymore.
 sizeCheck :: forall a. Array a -> Int -> Either String Unit
 sizeCheck params expected
     | (length params) < expected = Left "Fewer params than expected"
@@ -146,6 +141,7 @@ builtinOps = over I.Operators replace I.emptyOperators
       , sixth =
           [ I.Operator (I.Foreign builtinAdd) (I.Infix "+" Op.AssocRight)
           , I.Operator (I.Foreign builtinMultiply) (I.Infix "*" Op.AssocRight)
+          , I.Operator (I.Foreign (convertFn negateNum)) (I.Prefix "-")
           ]
       }
 

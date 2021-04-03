@@ -15,6 +15,8 @@ import Interpret (Value(..), Tag, TagSet(..), SimmerFn)
 {-
     Functionality to have the host language (Purescript) interface with the embedded language (Simmer).
     Could maybe rename to "Convert" or something less generic.
+
+    Now that I think about it, how is this supposed to work with the currying I want to implement in the future?
     -}
 
 class ToValue a where
