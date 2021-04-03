@@ -11,7 +11,7 @@ data Expression
     | String String
     | Function (Array Name) Expression
     | Assignment Name Expression Expression
-    -- Body and a single param
+    | EmptyCall Expression
     | Call Expression Expression
     | If Expression Expression Expression
     | List (Array Expression)
@@ -27,6 +27,7 @@ instance showExpression :: Show Expression where
                  String s -> "Str(" <> show s <> ")"
                  Function params body -> "Fn " <> show params <> "<" <> show body <> ">"
                  Assignment name expr body -> "Let (" <> show name <> ") Equals (" <> show expr <> ") \n     In (" <> show body <> ")"
+                 EmptyCall fn -> "(" <> show fn <> ")!"
                  Call fn input -> "Call<" <> show fn <> ">(" <> show input <> ")"
                  If pred thn els -> "If " <> show pred <> " then " <> show thn <> " else " <> show els
                  List items -> "[ " <> (joinWith ", " (show <$> items)) <> " ]"

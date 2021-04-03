@@ -90,7 +90,7 @@ ifParsing = describe "Test parsing prefixes" do
 ops :: Op.OperatorTable Expression
 ops =
     [ [ infixOp Op.AssocRight "*" ]
-    , [ prefixOp "&", postfixOp "!", prefixOp "-" ]
+    , [ prefixOp "&", postfixOp "?", prefixOp "-" ]
     , [ infixOp Op.AssocRight "+" ]
     , [ infixOp Op.AssocRight "==" ]
     ]
@@ -129,7 +129,7 @@ generalParsing = describe "Test general parsing" do
     it "Test prefix operator" do
        parse ops "&foo" `shouldEqual` Right (Call (Ident "&") (Ident "foo"))
     it "Test postfix operator" do
-       parse ops "foo!" `shouldEqual` Right (Call (Ident "!") (Ident "foo"))
+       parse ops "foo?" `shouldEqual` Right (Call (Ident "?") (Ident "foo"))
     it "Testing operator precedence" do
        parse ops "1 + 2 * 3" `shouldEqual` Right (Call (Call (Ident "+") (Number 1.0)) (Call (Call (Ident "*") (Number 2.0)) (Number 3.0)))
     it "Testing operator precedence other way" do
@@ -159,6 +159,9 @@ generalParsing = describe "Test general parsing" do
        parse ops "log @123" `shouldEqual` Left (ParseError "Could not match character '\\''")
     it "Test lists" do
        parse ops "[2, 3, 5]" `shouldEqual` Right (List [Number 2.0, Number 3.0, Number 5.0])
+    it "Test empty function call" do
+       parse ops "foo!" `shouldEqual` Right (EmptyCall (Ident "foo"))
+
 
 longerExample :: String
 longerExample = """

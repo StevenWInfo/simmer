@@ -46,26 +46,30 @@ removeComments :: Parser String
 removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
     where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
 
+emptyCall :: Op.Operator Expression
+emptyCall = Op.Postfix do
+    _ <- char '!'
+    pure EmptyCall
+
 fnApplication :: Op.Operator Expression
 fnApplication = Op.Infix parser Op.AssocLeft
     where
+      handleNext Nothing = pure (\fn -> \param -> Call fn param)
+      handleNext _ = fail "Should backtrack here."
+      placeholderEof = (\_ -> "") <$> eof
       parser = try $ do
          spaces <- whiteSpace
          if spaces == "" then fail "Not fn application" else pure unit
          next <- lookAhead <<< optionMaybe <<< choice $ placeholderEof : opParser : (string <$> badStarts)
          handleNext next
       -- I'd like to get actual error here.
-      handleNext Nothing = pure (\fn -> \param -> Call fn param)
-      handleNext _ = fail "Should backtrack here."
-      placeholderEof = (\_ -> "") <$> eof
 
 -- Just removes comments
 parse :: Op.OperatorTable Expression -> String -> Either ParseError Expression
 parse opTable source = uncommented >>= runParser (expressionParser modifiedTable)
     where
       uncommented = runParser removeComments source
-      addTop top = fnApplication : top
-      -- modifiedTable = modifyAtIndices [(length opTable - 1)] addTop opTable
+      addTop top = emptyCall : fnApplication : top
       modifiedTable = modifyAtIndices [0] addTop opTable
 
 -- type ParserWithOps = ReaderT (Op.OperatorTable Expression) Parser Expression
@@ -229,6 +233,7 @@ reservedOperators =
     , "="
     , "["
     , "]"
+    , "!"
     ]
 
 opCharacters :: Array Char
