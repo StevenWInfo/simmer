@@ -157,6 +157,8 @@ generalParsing = describe "Test general parsing" do
     -- It would be nice if the error actually said the character.
     it "Test function call number" do
        parse ops "log @123" `shouldEqual` Left (ParseError "Could not match character '\\''")
+    it "Test lists" do
+       parse ops "[2, 3, 5]" `shouldEqual` Right (List [Number 2.0, Number 3.0, Number 5.0])
 
 longerExample :: String
 longerExample = """

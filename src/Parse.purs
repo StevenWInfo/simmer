@@ -4,7 +4,7 @@ import Prelude hiding (between)
 import Control.Alt ((<|>))
 import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
 import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice)
+import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice, sepBy)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
@@ -14,7 +14,8 @@ import Data.String.CodeUnits (singleton)
 import Data.Either (Either(..))
 import Control.Lazy (fix)
 import Data.Array ((:), modifyAtIndices)
-import Data.List.NonEmpty (toUnfoldable)
+import Data.List (toUnfoldable)
+import Data.List.NonEmpty as NonEmpty
 
 import Ast (Expression(..), Name)
 
@@ -28,6 +29,7 @@ import Ast (Expression(..), Name)
     Can simplify it a lot with OperatorTable. Might even be able to do most of it with buildExprParser.
     -}
 
+-- TODO Probably should use the actual string parser.
 identifyString :: Parser String
 identifyString = do
     str <- fromChars <$> between (char '"') (char '"') (many $ noneOf ['"'])
@@ -74,6 +76,7 @@ factor expParser = numberExpr
     <|> parenExpr expParser
     <|> ifParser expParser
     <|> assignmentExpr expParser
+    <|> (try $ listParser expParser)
     <|> (try $ lambdaExpr expParser)
     <|> (try identExpr)
     
@@ -214,16 +217,18 @@ lambdaExpr expParser = do
     params <- identExprStr `endBy1` whiteSpace
     _ <- justName "->"
     exp <- expParser
-    pure $ Function (toUnfoldable params) exp
+    pure $ Function (NonEmpty.toUnfoldable params) exp
 
 reservedOperators :: Array String
 reservedOperators =
     [ "("
+    , ")"
     , "\\"
     , "->"
     , "\""
-    , ")"
     , "="
+    , "["
+    , "]"
     ]
 
 opCharacters :: Array Char
@@ -281,3 +286,10 @@ postfixOp :: String -> Op.Operator Expression
 postfixOp opStr = Op.Postfix do
     _ <- string opStr
     pure (\left -> Call (Ident opStr) left)
+
+listParser :: Parser Expression -> Parser Expression
+listParser expParser = do
+    let sepParser = char ',' *> whiteSpace
+    let innerParser = sepBy expParser sepParser
+    exprs <- between (char '[') (char ']') innerParser
+    pure <<< List <<< toUnfoldable $ exprs
