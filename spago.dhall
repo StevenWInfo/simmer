@@ -14,6 +14,7 @@ You can edit this file as you like.
   , "ordered-collections"
   , "psci-support"
   , "purescript-yarn"
+  , "random"
   , "spec"
   , "string-parsers"
   ]

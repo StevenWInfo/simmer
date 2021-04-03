@@ -14,6 +14,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Parse (parseSuite)
 import Test.Interpret (interpretSuite)
 import Test.Builtin (builtinSuite)
+import Test.Std.Random as Random
 
 import Main (runFile)
 import Interpret as I
@@ -24,6 +25,7 @@ main = launchAff_ $ runSpec [consoleReporter] do
     interpretSuite
     mainSuite
     builtinSuite
+    Random.suite
 
 mainSuite :: Spec Unit
 mainSuite = describe "Tests for Main functionality" do

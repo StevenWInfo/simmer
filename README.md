@@ -11,3 +11,4 @@
 - Should make documentation for implementers of the language in other host languages.
 - Make a formal grammar.
 - Should probably rename all modules to "Simmer.MODULE".
+- May want to move the simmer standard library out of this library to reduce the number of spago dependencies and only include if you want it. Purescript does that for everything outside of Prelude.
