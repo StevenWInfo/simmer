@@ -184,6 +184,11 @@ eval env (AST.Call body lastParamExpr) = accumulator [] (AST.Call body lastParam
                     Left err -> pure $ Left err
                     Right finalBody -> callValue env finalBody accum
 
+eval env (AST.EmptyCall body) = do
+    evaluatedBody <- eval env body
+    case evaluatedBody of
+        Left err -> pure $ Left err
+        Right finalBody -> callValue env finalBody []
 
    -- No, other way around. Enclose first call, then enclose second call.
 -- (Call (Call (first + second + 7) (secondVal)) (firstVal))

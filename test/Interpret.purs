@@ -66,6 +66,11 @@ logStr str = do
     _ <- log str
     pure $ Right "foo"
 
+logLorem :: Effect (Either String String)
+logLorem = do
+    _ <- log "lorem"
+    pure $ Right "lorem"
+
 basicEnv :: I.Environment
 basicEnv = I.Environment
     { values: fromFoldable
@@ -73,6 +78,7 @@ basicEnv = I.Environment
     , Tuple "one" (I.NumberVal 1.0)
     , Tuple "id" (I.FunctionVal simpleFn)
     , Tuple "logStr" (I.FunctionVal <<< I.Foreign <<< convertFn $ logStr)
+    , Tuple "logLorem" (I.FunctionVal <<< I.Foreign <<< convertFn $ logLorem)
     ]
     }
 
@@ -128,3 +134,6 @@ parseAndEval = describe "Parsing then evaluating" do
     it "Test eval' logStr" do
        result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"Hello world\"")
        result `shouldEqual` Right (I.StringVal "foo")
+    it "Test eval' logLorem. Should also say lorem above this test" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "logLorem!")
+       result `shouldEqual` Right (I.StringVal "lorem")
