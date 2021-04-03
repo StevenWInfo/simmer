@@ -1,6 +1,7 @@
 module Builtin where
 
 import Prelude
+import Effect (Effect)
 import Data.Map (Map, fromFoldable)
 import Data.Newtype (over)
 import Data.Tuple (Tuple(..))
@@ -64,6 +65,20 @@ builtinSubtract params = pure $ do
       subtr (I.NumberVal l) (I.NumberVal r) = Right (I.NumberVal (l - r))
       subtr _ _ = Left "Expecting numbers to subtract (-)"
 
+builtinMultiply :: I.TempForeignFn
+builtinMultiply = I.convertFn mult
+    where
+      mult :: Number -> Number -> Effect (Either String Number)
+      mult a b = pure $ Right (a * b)
+
+{-
+builtinNegative :: I.TempForeignFn
+builtinNegative = I.convertFn negative
+    where
+      negative :: Number -> Effect (Either String Number)
+      negative a = pure $ Right (-a)
+      -}
+
 -- Could make a bunch of simplifying functions that take an array and return tuples of values.
 
 sizeCheck :: forall a. Array a -> Int -> Either String Unit
@@ -114,6 +129,7 @@ builtinOps = over I.Operators replace I.emptyOperators
       replace empty = empty { first = [ ]
       , sixth =
           [ I.Operator (I.Foreign builtinAdd) (I.Infix "+" Op.AssocRight)
+          , I.Operator (I.Foreign builtinMultiply) (I.Infix "*" Op.AssocRight)
           ]
       }
 

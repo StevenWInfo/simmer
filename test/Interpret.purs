@@ -12,6 +12,7 @@ import Effect.Class (liftEffect)
 import Effect.Aff (Aff)
 import Data.Tuple (Tuple(..))
 import Data.Newtype (over)
+import Effect.Class.Console (log)
 import Text.Parsing.StringParser.Expr as Op
 
 import Ast as AST
@@ -59,12 +60,18 @@ twoParam = I.Foreign handleMaybe
       fn _ _ = do
        pure <<< Left $ "Expected two numbers."
 
+logStr :: String -> Effect (Either String String)
+logStr str = do
+    _ <- log str
+    pure $ Right "foo"
+
 basicEnv :: I.Environment
 basicEnv = I.Environment
     { values: fromFoldable
     [ Tuple "foo" (I.StringVal "bar")
     , Tuple "one" (I.NumberVal 1.0)
     , Tuple "id" (I.FunctionVal simpleFn)
+    , Tuple "logStr" (I.FunctionVal <<< I.Foreign <<< I.convertFn $ logStr)
     ]
     }
 
@@ -117,3 +124,6 @@ parseAndEval = describe "Parsing then evaluating" do
     it "Test eval' plus" do
        result <- (liftEffect $ I.eval' [ basicLib ] "3 + 7")
        result `shouldEqual` Right (I.NumberVal 10.0)
+    it "Test eval' logStr" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"Hello world\"")
+       result `shouldEqual` Right (I.StringVal "foo")

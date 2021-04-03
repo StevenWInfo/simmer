@@ -29,3 +29,6 @@ builtinSimple = describe "Simple eval stuff" do
     it "Test add smoke" do
        result <- liftEffect $ builtinEval "2 + 3"
        result `shouldEqual` Right (I.NumberVal 5.0)
+    it "Test multiply smoke" do
+       result <- liftEffect $ builtinEval "2 * 3"
+       result `shouldEqual` Right (I.NumberVal 6.0)

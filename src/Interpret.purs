@@ -9,8 +9,8 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Text.Parsing.StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
-import Data.Tuple.Nested (tuple2)
-import Data.Array (concat, fold, length, zip, (:), (!!))
+import Data.Tuple.Nested (tuple2, uncurry2)
+import Data.Array (concat, fold, length, zip, (:), (!!), uncons)
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
@@ -357,6 +357,72 @@ instance fromValueInt :: FromValue Int where
                                   Nothing -> Left "Got Number but expected Integer"
     fromValue _ = Left "Expected Number that is an Integer"
 
+instance fromValueTag :: FromValue Tag where
+    fromValue (TagVal t) = Right t
+    fromValue _ = Left "Expected Tag"
+
+class ConvertHostFn r where
+    convertFn :: r -> Array Value -> Effect (Either String Value)
+
+instance convertHostFnNumber :: ConvertHostFn Number where
+    convertFn n [] = pure <<< Right <<< toValue $ n
+    convertFn n nonEmpty = pure <<< Left $ "Given more arguments than expected"
+
+instance convertHostFnNumberFn :: (ConvertHostFn r) => ConvertHostFn (Number -> r) where
+    convertFn fn [] = pure $ Left "Given fewer arguments than expected"
+    convertFn fn arr = do
+       let eParams = do
+                        { head: x, tail: y } <- note "Given fewer arguments than expected" $ uncons arr
+                        val <- fromValue x
+                        pure { val, tail: y }
+       case eParams of
+           Left err -> pure <<< Left $ err
+           Right { val: x, tail: y } -> convertFn (fn x) y
+
+genericConvertResult :: forall r. (ToValue r) => Effect (Either String r) -> Array Value -> Effect (Either String Value)
+genericConvertResult x [] = (map toValue) <$> x
+genericConvertResult x nonEmpty = do
+    _ <- x
+    pure <<< Left $ "Given more arguments than expected"
+
+-- genericConvertFull :: forall a b. (FromValue a) => (ConvertHostFn b) => 
+
+genericValueConvertFn :: forall r. (ToValue r) => r -> Array Value -> Effect (Either String Value)
+genericValueConvertFn x [] = pure <<< Right <<< toValue $ x
+genericValueConvertFn x nonEmpty = pure <<< Left $ "Given more arguments than expected"
+
+genericFnConvertFn :: forall a b. (FromValue a) => (ConvertHostFn b) => (a -> b) -> Array Value -> Effect (Either String Value)
+genericFnConvertFn fn [] = pure $ Left "Given fewer arguments than expected"
+genericFnConvertFn fn arr = do
+   let eParams = do
+                    { head: x, tail: y } <- note "Given fewer arguments than expected" $ uncons arr
+                    val <- fromValue x
+                    pure { val, tail: y }
+   case eParams of
+       Left err -> pure <<< Left $ err
+       Right { val: x, tail: y } -> convertFn (fn x) y
+
+instance convertHostFnResult :: (ToValue r) => ConvertHostFn (Effect (Either String r)) where
+    convertFn = genericConvertResult
+
+instance convertHostFnString :: ConvertHostFn String where
+    convertFn = genericValueConvertFn
+
+instance convertHostFnStringFn :: (ConvertHostFn r) => ConvertHostFn (String -> r) where
+    convertFn = genericFnConvertFn
+
+instance convertHostFnInt :: ConvertHostFn Int where
+    convertFn = genericValueConvertFn
+
+instance convertHostFnIntFn :: (ConvertHostFn r) => ConvertHostFn (Int -> r) where
+    convertFn = genericFnConvertFn
+
+instance convertHostFnTag :: ConvertHostFn Tag where
+    convertFn = genericValueConvertFn
+
+instance convertHostFnTagFn :: (ConvertHostFn r) => ConvertHostFn (Tag -> r) where
+    convertFn = genericFnConvertFn
+
 {- TODO Tag, Fn, and Array.
 instance fromValueString :: FromValue String where
     fromValue (StringVal s) = Right s
@@ -375,12 +441,14 @@ instance fromValueString :: FromValue String where
 -- Maybe this is fine. Just have them wrap the function in this. I'd rather automate that step, but it looks difficult.
 -- Rename to OneParam, TwoParam, ...
 data SimmerFn = One (forall a z. FromValue a => ToValue z => a -> Effect (Either String z))
-    -- | Two (forall a b z. FromValue a => FromValue b => ToValue z => a -> b -> Effect (Either String z))
+    | Two (forall a b z. FromValue a => FromValue b => ToValue z => a -> b -> Effect (Either String z))
 
 -- Maybe if I have two or three type parameters instead where two are the two different To and From Value types, superclass them with those typeclasses, and then maybe throw some functional dependencies in for good measure it will work.
 -- Or maybe, I can use phantom types instead.
 class ToSimmerFn a where
     toSimmer :: a -> SimmerFn
+
+--data Lorem a b c = Foo 
 
 --instance toSimmerFnOne :: ToSimmerFn (forall a b. ToValue a => FromValue b => a -> Effect b) where
     --toSimmer = One
@@ -410,13 +478,8 @@ str = retString ""
 
 fromParam :: forall a. FromValue a => Array Value -> Int -> Either String a
 fromParam arr i = do
-    val <- foo
-    bar val
-    where
-      foo :: Either String Value
-      foo = note "Expecting at least one parameter" $ arr !! i
-      bar :: Value -> Either String a
-      bar v = fromValue v
+    val <- note "Expecting at least one parameter" $ arr !! i
+    fromValue val
 
 
 {-
@@ -425,33 +488,24 @@ fromParam arr i = do
 
 -- I think maybe I have to tie the FromValue coming out of fromParam more directly to the FromValue in fn
 
---simpleToForeign :: forall a. FromValue a => SimmerFn -> TempForeignFn
 -}
-simpleToForeign :: forall a z. FromValue a => ToValue z => SimmerFn -> Array Value -> Effect (Either String Value)
+-- I'm not entirely sure why having the z type param makes it work, but it does.
+--simpleToForeign :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn -> Array Value -> Effect (Either String Value)
+simpleToForeign :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn -> TempForeignFn
 simpleToForeign (One fn) arr = do
     let eFirst = (fromParam arr 0) :: Either String a
     case eFirst of
-        Right first -> (map fixedToValue) <$> (fn first)
+        Right first -> (map (toValue :: z -> Value)) <$> (fn first)
         Left msg -> (pure $ Left msg)
 
-    where
-      -- Thinking about it, I'm not exactly sure why this works.
-      fixedToValue :: z -> Value
-      fixedToValue = toValue
-
-{-
 simpleToForeign (Two fn) arr = do
     let eParams = do
-                    first <- fromParam arr 0
-                    second <- fromParam arr 1
+                    first <- fromParam arr 0 :: Either String a
+                    second <- fromParam arr 1 :: Either String b
                     pure $ tuple2 first second
     case eParams of
-        Right (Tuple first (Tuple second unit)) -> fn first second
+        Right params -> (map (toValue :: z -> Value)) <$> ((uncurry2 fn) params)
         Left msg -> pure $ Left msg
 
-{-
-simpleToForeign (Two fn) = \arr -> pure do
-    first <- note "Expecting at least one parameter" $ arr !! 0
-    second <- note "Expecting at least two parameters" $ arr !! 1
-    pure $ fn first second
-    -}
+-- foo :: SimmerFn -> TempForeignFn
+-- foo fn arr = let bar = (fn :: forall a b z. FromValue a => FromValue b => ToValue z => SimmerFn) in simpleToForeign bar arr
