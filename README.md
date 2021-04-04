@@ -1,14 +1,9 @@
 # Simmer
 
-- In hindsight, I probably should have made "parenthesis" be one of the AST values. It's another "special case" but I have to handle it specially in the parse and interpret code so it probably should be a special case.
+Simmer is an embedded scripting language designed to make writing code fast and easy.
 
-## TODO
+The only language that it's currently implemented and embedded in is (Purescript)[https://www.purescript.org/]. It could be implemented in other "host" languages, but there's currently no work being done to implement it into other languages.
 
-- Figure out a lot of stuff.
-- Not even considering imports yet.
-- Probably need some sort of monad for evaluation with the environment (state monad?)
-- If conditional can just be shorthand/sugar for a function that takes pairs of functions that are called without parameters, the first being something that returns a boolean to see if the second is evaluated.
-- Should make documentation for implementers of the language in other host languages.
-- Make a formal grammar.
-- Should probably rename all modules to "Simmer.MODULE".
-- May want to move the simmer standard library out of this library to reduce the number of spago dependencies and only include if you want it. Purescript does that for everything outside of Prelude.
+In Simmer, there is no way to export code from one file and use it in another. Simmer is made to be both simple and good for scripting, not for creating libraries. Instead, you write the libraries that Simmer code needs in the host language like Purescript which is much better for writing libraries in.
+
+You can use Simmer as a regular embedded language to put into tools written in the host language, but most of the focus is on using Simmer as a scripting language that happens to have its libraries written in the host langauge.
