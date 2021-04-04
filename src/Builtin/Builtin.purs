@@ -12,6 +12,7 @@ import Text.Parsing.StringParser.Expr as Op
 
 import Interpret as I
 import Interface (convertFn)
+import Builtin.Tags (tags, voidTag)
 
 -- import Debug.Trace (spy)
 
@@ -118,17 +119,10 @@ builtinFns = (I.FunctionVal <<< I.Foreign) <$> (fromFoldable fns)
           [ Tuple "log" log 
           ]
 
-voidTag :: I.Tag
-voidTag = I.newTag "Void" I.emptyTagValue
-
 builtinVals :: Array (Tuple String I.Value)
-builtinVals =
-    [ tagEntry I.Empty
-    , tagEntry voidTag
+builtinVals = tags <>
+    [ 
     ]
-    where
-      tagEntry (I.Empty) = Tuple "EmptyTag" I.emptyTagValue
-      tagEntry tag@(I.Tag t) = Tuple (show t.symbol) $ I.TagVal tag
 
 builtinEnv :: I.Environment
 builtinEnv = I.Environment
