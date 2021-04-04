@@ -13,7 +13,7 @@ You can edit this file as you like.
   , "optparse"
   , "ordered-collections"
   , "psci-support"
-  , "purescript-yarn"
+  --, "purescript-yarn"
   , "random"
   , "spec"
   , "string-parsers"

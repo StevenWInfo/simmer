@@ -8,13 +8,12 @@ import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, o
 import Text.Parsing.StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
-import Data.String.Yarn (fromChars)
-import Data.Foldable (fold, elem)
-import Data.String.CodeUnits (singleton)
+import Data.Foldable (fold, elem, class Foldable)
+import Data.String.CodeUnits (singleton, fromCharArray)
 import Data.Either (Either(..))
 import Control.Lazy (fix)
-import Data.Array ((:), modifyAtIndices)
-import Data.List (toUnfoldable)
+import Data.Array ((:), modifyAtIndices, fromFoldable)
+import Data.List ( toUnfoldable)
 import Data.List.NonEmpty as NonEmpty
 
 import Ast (Expression(..), Name)
@@ -29,22 +28,25 @@ import Ast (Expression(..), Name)
     Can simplify it a lot with OperatorTable. Might even be able to do most of it with buildExprParser.
     -}
 
+foldableToString :: forall f. Foldable f => f Char -> String
+foldableToString = fromCharArray <<< fromFoldable
+
 -- TODO Probably should use the actual string parser.
 identifyString :: Parser String
 identifyString = do
-    str <- fromChars <$> between (char '"') (char '"') (many $ noneOf ['"'])
+    str <- foldableToString <$> between (char '"') (char '"') (many $ noneOf ['"'])
     pure $ "\"" <> str <> "\""
 
 comment :: Parser String
 comment = do
-    _ <- fromChars <$> between (char '#') end (many $ noneOf ['\n'])
+    _ <- foldableToString <$> between (char '#') end (many $ noneOf ['\n'])
     pure ""
     where
       end = lookAhead $ (singleton <$> char '\n') <|> ((\_ -> "") <$> eof)
 
 removeComments :: Parser String
 removeComments = fold <$> many (identifyString <|> comment <|> untilSignificant)
-    where untilSignificant = fromChars <$> (many1 $ noneOf ['"', '#'])
+    where untilSignificant = foldableToString <$> (many1 $ noneOf ['"', '#'])
 
 emptyCall :: Op.Operator Expression
 emptyCall = Op.Postfix do
@@ -109,8 +111,8 @@ toNumber = do
     neg <- string "-" <|> pure ""
     whole <- many1 anyDigit
     dec <- string "." <|> pure ""
-    less <- if dec == "." then fromChars <$> (many1 anyDigit) else pure ""
-    let numString = neg <> fromChars whole <> dec <> less
+    less <- if dec == "." then foldableToString <$> (many1 anyDigit) else pure ""
+    let numString = neg <> foldableToString whole <> dec <> less
     case fromString numString  of
         Just num -> pure num
         Nothing -> fail "Couldn't parse number"
@@ -121,13 +123,13 @@ numberExpr = Number <$> toNumber
 stringExpr :: Parser Expression
 stringExpr = do
     _ <- String <$> (string "\"")
-    value <- (String <<< fromChars) <$> (many $ noneOf ['"'])
+    value <- (String <<< foldableToString ) <$> (many $ noneOf ['"'])
     _ <- String <$> string "\""
     pure value
 
 identExprStr :: Parser String
 identExprStr = do
-    name <- fromChars <$> many1 nameCharacters
+    name <- foldableToString <$> many1 nameCharacters
     let possibleNum = runParser numberExpr name
     case possibleNum of
         Left _ -> pure unit
@@ -138,7 +140,7 @@ identExprStr = do
 
 identExpr :: Parser Expression
 identExpr = Ident <$> identExprStr{-do
-    name <- fromChars <$> many1 nameCharacters
+    name <- fromCharArray <$> many1 nameCharacters
     if elem name reserved then fail msg else (pure <<< Ident $ name)
     where
       msg = "Using reserved name in unrecognized way"
@@ -174,7 +176,7 @@ nameCharacters = alphaNum <|> (char '_') <|> (char '\'')
 
 nameParser :: Parser Name
 nameParser = do
-    name <- fromChars <$> many nameCharacters--manyTill anyChar whiteSpace 
+    name <- foldableToString <$> many nameCharacters--manyTill anyChar whiteSpace 
     _ <- if elem name reserved then fail "Tried to assign to reserved name" else pure ""
     pure name
 
@@ -250,7 +252,7 @@ opParser :: Parser String
 opParser = do
     let opCharParser = oneOf opCharacters
     chars <- many1 opCharParser
-    pure $ fromChars chars
+    pure $ foldableToString chars
 
 ifParser :: Parser Expression -> Parser Expression
 ifParser expParser = do
