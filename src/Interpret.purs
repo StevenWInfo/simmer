@@ -131,9 +131,11 @@ getFunctions ops = fromFoldable (map toTup (concat (toArrays ops)))
                     Prefix name -> name
                     Postfix name -> name
 
+-- Maybe this *should* be an actual type. Has to be a tuple anyways.
 type Library = Tuple Environment Operators
 
 -- Not sure how to handle operators and general defined stuff quite yet.
+-- Maybe this should take a "single" library and the user has to figure out how to merge everything together.
 interpret :: Array Library -> String -> Effect Unit
 interpret libs script = eval' libs script *> pure unit
 

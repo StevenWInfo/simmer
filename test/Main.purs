@@ -16,6 +16,8 @@ import Test.Interpret (interpretSuite)
 import Test.Builtin (builtinSuite)
 import Test.Std.Random as Random
 
+import Builtin (builtinLibrary)
+import Std (libraries)
 import Main (runFile)
 import Interpret as I
 
@@ -31,8 +33,11 @@ mainSuite :: Spec Unit
 mainSuite = describe "Tests for Main functionality" do
     simpleTests
 
+stdLib :: Array I.Library
+stdLib = ([ builtinLibrary ] <> libraries)
+
 simpleTests :: Spec Unit
 simpleTests = describe "Simple Main functionality tests" do
     it "Test runFile smoke" do
-       result <- liftEffect $ runFile "test/scripts/smoke.smr"
+       result <- liftEffect $ runFile stdLib "test/scripts/smoke.smr"
        result `shouldEqual` Right (I.NumberVal 7.0)

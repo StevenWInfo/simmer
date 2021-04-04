@@ -6,30 +6,34 @@ import Effect.Console (log)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 import Data.Either (Either(..))
+import Options.Applicative ((<**>))
 import Options.Applicative as O
 
 -- import Repl (runRepl)
 import Builtin (builtinLibrary)
 import Std (libraries)
-import Interpret (Value, eval')
+import Interpret (Value, eval', Library)
 
 main :: Effect Unit
-main = O.execParser opts >>= handleCmd
+main = cli ([ builtinLibrary ] <> libraries)
+
+cli :: Array Library -> Effect Unit
+cli lib = O.execParser opts >>= (handleCmd lib)
     where
-      opts = O.info (cmd O.<**> O.helper)
+      opts = O.info (cmd <**> O.helper)
           ( O.fullDesc
           <> O.progDesc "A Simmer interpreter"
           <> O.header "Only works with --file command currently" )
 
 -- With spago do `spago run --exec-args "--file FILE"`
-runFile :: String -> Effect (Either String Value)
-runFile filename = do
+runFile :: Array Library -> String -> Effect (Either String Value)
+runFile lib filename = do
     text <- readTextFile UTF8 filename
-    eval' ([ builtinLibrary ] <> libraries) text
+    eval' lib text
 
-handleCmd :: Cmd -> Effect Unit
-handleCmd (File file) = do
-    result <- (runFile file)
+handleCmd :: Array Library -> Cmd -> Effect Unit
+handleCmd lib (File file) = do
+    result <- (runFile lib file)
     case result of
         Left msg -> log msg
         Right val -> log $ "Final value was: " <> show val
