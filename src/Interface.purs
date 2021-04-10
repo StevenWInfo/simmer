@@ -1,16 +1,16 @@
-module Interface where
+module Simmer.Interface where
 
 import Prelude
 import Effect (Effect)
 import Data.Either (Either(..), note)
 import Data.Int (toNumber, fromNumber)
 import Data.Map (Map)
-import Symbol (Symbol)
 import Data.Maybe (Maybe(..))
 import Data.Array (uncons)
 import Data.Traversable (sequence)
 
-import Interpret (Value(..), Tag, TagSet(..), SimmerFn)
+import Simmer.Symbol (Symbol)
+import Simmer.Interpret (Value(..), Tag, TagSet(..), SimmerFn)
 
 {-
     Functionality to have the host language (Purescript) interface with the embedded language (Simmer).

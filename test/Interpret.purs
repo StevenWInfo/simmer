@@ -15,9 +15,9 @@ import Data.Newtype (over)
 import Effect.Class.Console (log)
 import Text.Parsing.StringParser.Expr as Op
 
-import Interface (convertFn)
-import Ast as AST
-import Interpret as I
+import Simmer.Interface (convertFn)
+import Simmer.Ast as AST
+import Simmer.Interpret as I
 
 interpretSuite :: Spec Unit
 interpretSuite = describe "Interpreter tests" do

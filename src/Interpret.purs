@@ -1,4 +1,4 @@
-module Interpret where
+module Simmer.Interpret where
 
 import Prelude
 import Effect (Effect)
@@ -14,9 +14,9 @@ import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
 import Text.Parsing.StringParser (ParseError(..))
 
-import Ast as AST
-import Parse (parse, infixOp, prefixOp, postfixOp)
-import Symbol (Symbol, symbol)
+import Simmer.Ast as AST
+import Simmer.Parse (parse, infixOp, prefixOp, postfixOp)
+import Simmer.Symbol (Symbol, symbol)
 
 -- import Debug.Trace (spy)
 

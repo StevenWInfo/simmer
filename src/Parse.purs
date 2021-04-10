@@ -1,4 +1,4 @@
-module Parse where
+module Simmer.Parse where
 
 import Prelude hiding (between)
 import Control.Alt ((<|>))
@@ -16,7 +16,7 @@ import Data.Array ((:), modifyAtIndices, fromFoldable)
 import Data.List ( toUnfoldable)
 import Data.List.NonEmpty as NonEmpty
 
-import Ast (Expression(..), Name)
+import Simmer.Ast (Expression(..), Name)
 
 -- import Debug.Trace (spy)
 

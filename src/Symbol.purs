@@ -1,4 +1,4 @@
-module Symbol where
+module Simmer.Symbol where
 
 import Prelude (Unit, class Show, (<>), class Eq)
 
