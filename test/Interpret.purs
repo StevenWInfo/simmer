@@ -23,6 +23,7 @@ interpretSuite :: Spec Unit
 interpretSuite = describe "Interpreter tests" do
     evalSimple
     parseAndEval
+    longerTests
 
 emptyEnviron :: I.Environment
 emptyEnviron  = I.Environment { values: empty }
@@ -150,3 +151,18 @@ parseAndEval = describe "Parsing then evaluating" do
        -- TODO This should fail. It's not a recognized operator
        result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"lorem\"~ logStr \"ipsum\"~ id 5~ id 7")
        result `shouldEqual` Left "I don't remember what the message should be but it should be left"
+
+longerTests :: Spec Unit
+longerTests = describe "Some longer tests" do
+    it "Longer test with lambda" do
+       result <- basicEval longerInput1
+       result `shouldEqual` Right (I.NumberVal 7.0)
+    where
+      basicEval = liftEffect <$> I.eval' [ basicLib ]
+
+longerInput1 :: String
+longerInput1 = """
+    let a = 5 in
+    let b = 2 in
+    (\x -> x + b) a
+    """

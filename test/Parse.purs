@@ -219,3 +219,20 @@ longerParsing = describe "Test longer parsing" do
        parse ops longerExample `shouldEqual` Right longerExampleAst
     it "Testing a longer expression 2" do
        parse ops longerExample2 `shouldEqual` Right longerExampleAst2
+    it "Testing a longer expression 3" do
+       parse ops longerExample3 `shouldEqual` Right longerExampleAst3
+
+longerExample3 :: String
+longerExample3 = """
+    let a = 5 in
+    let b = 2 in
+    (\x -> x + b) a
+    """
+
+longerExampleAst3 :: Expression
+longerExampleAst3 =
+    (Assignment "a" (Number 5.0)
+        (Assignment "b" (Number 2.0)
+            (Call (Call (Ident "(") (Function ["x"] (Call (Call (Ident "+") (Ident "x")) (Ident "b")))) (Ident "a"))
+            )
+            )
