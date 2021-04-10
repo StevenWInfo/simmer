@@ -16,7 +16,7 @@ import Data.Array ((:), modifyAtIndices, fromFoldable)
 import Data.List ( toUnfoldable)
 import Data.List.NonEmpty as NonEmpty
 
-import Simmer.Ast (Expression(..), Name)
+import Simmer.AST (Expression(..), Name)
 
 -- import Debug.Trace (spy)
 
@@ -236,6 +236,7 @@ reservedOperators =
     , "["
     , "]"
     , "!"
+    , ";"
     ]
 
 opCharacters :: Array Char

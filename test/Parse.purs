@@ -9,7 +9,7 @@ import Text.Parsing.StringParser.Expr as Op
 import Test.Spec (it, pending', describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 
-import Simmer.Ast (Expression(..))
+import Simmer.AST (Expression(..))
 import Simmer.Parse (numberExpr, stringExpr, removeComments, expressionParser,
 parse, identExpr, assignmentExpr, ifParser, infixOp,
     prefixOp, postfixOp)

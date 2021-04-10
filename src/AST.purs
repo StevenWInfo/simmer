@@ -1,4 +1,4 @@
-module Simmer.Ast where
+module Simmer.AST where
 
 import Prelude
 import Data.String.Common (joinWith)

@@ -16,7 +16,7 @@ import Effect.Class.Console (log)
 import Text.Parsing.StringParser.Expr as Op
 
 import Simmer.Interface (convertFn)
-import Simmer.Ast as AST
+import Simmer.AST as AST
 import Simmer.Interpret as I
 
 interpretSuite :: Spec Unit
@@ -64,7 +64,7 @@ twoParam = I.Foreign handleMaybe
 logStr :: String -> Effect (Either String String)
 logStr str = do
     _ <- log str
-    pure $ Right "foo"
+    pure $ Right (str <> " foo")
 
 logLorem :: Effect (Either String String)
 logLorem = do
@@ -133,7 +133,7 @@ parseAndEval = describe "Parsing then evaluating" do
        result `shouldEqual` Right (I.NumberVal 10.0)
     it "Test eval' logStr" do
        result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"Hello world\"")
-       result `shouldEqual` Right (I.StringVal "foo")
+       result `shouldEqual` Right (I.StringVal "Hello world foo")
     it "Test eval' logLorem. Should also say lorem above this test" do
        result <- (liftEffect $ I.eval' [ basicLib ] "logLorem!")
        result `shouldEqual` Right (I.StringVal "lorem")
@@ -143,3 +143,10 @@ parseAndEval = describe "Parsing then evaluating" do
     it "Test id on paren" do
        result <- (liftEffect $ I.eval' [ basicLib ] "id (3 + 7)")
        result `shouldEqual` Right (I.NumberVal 10.0)
+    it "Test semicolon" do
+       result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"lorem\"; logStr \"ipsum\"; id 5; id 7")
+       result `shouldEqual` Right (I.NumberVal 7.0)
+    it "Test nonsense operator" do
+       -- TODO This should fail. It's not a recognized operator
+       result <- (liftEffect $ I.eval' [ basicLib ] "logStr \"lorem\"~ logStr \"ipsum\"~ id 5~ id 7")
+       result `shouldEqual` Left "I don't remember what the message should be but it should be left"
