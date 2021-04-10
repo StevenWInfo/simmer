@@ -9,10 +9,8 @@ import Test.Spec.Reporter.Console (consoleReporter)
 
 import Test.Parse (parseSuite)
 import Test.Interpret (interpretSuite)
-import Test.Builtin (builtinSuite)
 
 main :: Effect Unit
 main = launchAff_ $ runSpec [consoleReporter] do
     parseSuite
     interpretSuite
-    builtinSuite
