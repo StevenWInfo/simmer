@@ -8,7 +8,6 @@ import Test.Spec.Assertions (shouldEqual)
 
 import Interpret as I
 import Builtin (builtinLibrary)
-import Std (libraries)
 import Simmer.CLI (runFile)
 
 suite :: Spec Unit
@@ -16,7 +15,7 @@ suite = describe "Tests for Main functionality" do
     simpleTests
 
 stdLib :: Array I.Library
-stdLib = ([ builtinLibrary ] <> libraries)
+stdLib = ([ builtinLibrary ] )
 
 simpleTests :: Spec Unit
 simpleTests = describe "Simple Main functionality tests" do
