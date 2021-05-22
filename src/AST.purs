@@ -33,7 +33,3 @@ instance showExpression :: Show Expression where
                  List items -> "[ " <> (joinWith ", " (show <$> items)) <> " ]"
 
 derive instance eqExpression :: Eq Expression 
-
--- Should there be an AST validator? Check structure without evaluating?
-
--- fn for start of function wouldn't be bad.

@@ -35,11 +35,6 @@ simpleFn = I.Lambda
     , environment: emptyEnviron
     }
 
--- TODO This obviously shows that creating foreign functions need to be simplified somehow.
--- One thing that could help would be a type class which converts things to I.Values.
--- Could also just have analogous types to Rough types that are members of the class that easily conver. E.g. Purescript Number to Rough Number, etc.
--- Could also probably use phantom types.
--- This is still probably going to be difficult. Would a scripting and App/Lib language developed together be significantly better?
 twoParam :: I.SimmerFn
 twoParam = I.Foreign handleMaybe
     where

@@ -18,10 +18,8 @@ import Data.List.NonEmpty as NonEmpty
 
 import Simmer.AST (Expression(..), Name)
 
--- import Debug.Trace (spy)
-
 {-
-    TODO parse importing
+    TODO parse import functionality
 
     I'd like to clean up a lot of this code.
     I'd like to use ReaderT to pass around the OperatorTable, but I couldn't figure out how to make a newtype of it an instance of the Lazy typeclass for `fix` to have mutual references.
@@ -139,12 +137,7 @@ identExprStr = do
       msg = "Using reserved name in unrecognized way"
 
 identExpr :: Parser Expression
-identExpr = Ident <$> identExprStr{-do
-    name <- fromCharArray <$> many1 nameCharacters
-    if elem name reserved then fail msg else (pure <<< Ident $ name)
-    where
-      msg = "Using reserved name in unrecognized way"
-      -}
+identExpr = Ident <$> identExprStr
 
 -- Allow alphanumeric (no just numbers) and certain other characters. Probably "'" and "_"
 reserved :: Array Name
@@ -176,7 +169,7 @@ nameCharacters = alphaNum <|> (char '_') <|> (char '\'')
 
 nameParser :: Parser Name
 nameParser = do
-    name <- foldableToString <$> many nameCharacters--manyTill anyChar whiteSpace 
+    name <- foldableToString <$> many nameCharacters
     _ <- if elem name reserved then fail "Tried to assign to reserved name" else pure ""
     pure name
 

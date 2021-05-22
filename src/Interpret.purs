@@ -18,8 +18,6 @@ import Simmer.AST as AST
 import Simmer.Parse (parse, infixOp, prefixOp, postfixOp)
 import Simmer.Symbol (Symbol, symbol)
 
--- import Debug.Trace (spy)
-
 data OpMeta
     = Infix String Op.Assoc
     | Prefix String
@@ -96,7 +94,7 @@ semicolon = Operator (Foreign throwAway) (Infix ";" Op.AssocRight)
          second <- note "Semicolon without following argument" $ index args 1
          pure second
 
--- TODO Should really put function call and empty call in here I think.
+-- TODO Should function call and empty call be put in here?
 specialOperators :: { top :: Array Operator, bottom :: Array Operator }
 specialOperators = 
     { top: []
@@ -206,9 +204,6 @@ eval env (AST.EmptyCall body) = do
         Left err -> pure $ Left err
         Right finalBody -> callValue env finalBody []
 
-   -- No, other way around. Enclose first call, then enclose second call.
--- (Call (Call (first + second + 7) (secondVal)) (firstVal))
-
 eval env expr = do
     pure $ Left "Not implemented"
 
@@ -292,7 +287,6 @@ derive instance eqValue :: Eq Value
 
 data Tag = Empty | Tag
     { symbol :: Symbol
-    -- , name :: AST.Name
     , value :: Value
     }
 
@@ -315,7 +309,6 @@ newtype TagSet = TagSet (Map Symbol Value)
 derive newtype instance showTagSet :: Show TagSet
 derive instance eqTagSet :: Eq TagSet
 
--- Uses Array for parameters, but could potentially make polyvariadic (at least in Haskell): https://wiki.haskell.org/Varargs
 type TempForeignFn = Array Value -> Effect (Either String Value)
 
 data ForeignFn = Param Value ForeignFn | Final (Value -> Effect (Either String Value))
