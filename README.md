@@ -1,4 +1,8 @@
-# Simmer
+# Simmer - DEPRECATED
+
+**DEPRECATED**: This was already basically an unfinished, basically abandonded toy project, but then I discovered Clojure and realized that it was basically the language I was trying to create (and certainly better). It was fun to make and I learned quite a bit though!
+
+---
 
 Simmer is an embedded scripting language designed to make writing code fast and easy.
 
