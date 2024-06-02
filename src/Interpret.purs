@@ -6,13 +6,13 @@ import Data.Map (Map, lookup, fromFoldable, unions, member, insert, keys, inters
 import Data.Either (Either(..), note)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
-import Text.Parsing.StringParser.Expr as Op
+import StringParser (ParseError(..))
+import StringParser.Expr as Op
 import Data.Tuple (Tuple(..), snd)
 import Data.Array (concat, fold, length, zip, (:), index)
 import Data.Traversable (sequence)
 import Data.String.Common (joinWith)
 import Data.Set (toUnfoldable)
-import Text.Parsing.StringParser (ParseError(..))
 
 import Simmer.AST as AST
 import Simmer.Parse (parse, infixOp, prefixOp, postfixOp)

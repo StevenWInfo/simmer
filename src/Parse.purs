@@ -2,10 +2,10 @@ module Simmer.Parse where
 
 import Prelude hiding (between)
 import Control.Alt ((<|>))
-import Text.Parsing.StringParser (Parser, fail, runParser, ParseError, try)
-import Text.Parsing.StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
-import Text.Parsing.StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice, sepBy)
-import Text.Parsing.StringParser.Expr as Op
+import StringParser (Parser, fail, runParser, ParseError, try)
+import StringParser.CodePoints (string, anyDigit, noneOf, char, eof, whiteSpace, skipSpaces, alphaNum, oneOf)
+import StringParser.Combinators (many1, many, between, lookAhead, optionMaybe, endBy1, choice, sepBy)
+import StringParser.Expr as Op
 import Data.Number (fromString)
 import Data.Maybe (Maybe(..))
 import Data.Foldable (fold, elem, class Foldable)

@@ -4,8 +4,8 @@ import Prelude
 import Effect.Exception (Error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
-import Text.Parsing.StringParser (runParser, ParseError(..))
-import Text.Parsing.StringParser.Expr as Op
+import StringParser (runParser, ParseError(..))
+import StringParser.Expr as Op
 import Test.Spec (it, pending', describe, SpecT)
 import Test.Spec.Assertions (shouldEqual)
 

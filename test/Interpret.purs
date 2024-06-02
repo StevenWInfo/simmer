@@ -13,7 +13,7 @@ import Effect.Aff (Aff)
 import Data.Tuple (Tuple(..))
 import Data.Newtype (over)
 import Effect.Class.Console (log)
-import Text.Parsing.StringParser.Expr as Op
+import StringParser.Expr as Op
 
 import Simmer.Interface (convertFn)
 import Simmer.AST as AST

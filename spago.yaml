@@ -1,0 +1,19 @@
+package:
+  dependencies:
+  - console
+  - debug
+  - effect
+  - node-fs
+  - node-readline
+  - numbers
+  - optparse
+  - ordered-collections
+  - psci-support
+  - spec
+  - string-parsers
+  name: simmer
+workspace:
+  extra_packages: {}
+  package_set:
+    registry: 47.10.0
+    #url: https://raw.githubusercontent.com/purescript/package-sets/psc-0.13.8-20210118/packages.json
